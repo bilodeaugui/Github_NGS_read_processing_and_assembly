@@ -2,25 +2,27 @@
 # This is to be done in the R command line and not in R studio
 #source("http://www.Bioconductor.org/biocLite.R")
 #biocLite("BiocUpgrade")
-################################################################################
-# Getting started in R
-# Set the working directory > setwd("~/")
-# Check version installed
-################################################################################
-#Building the STAR Reference Genome Index:
+
+
+Getting started in R: Set the working directory > setwd("~/") Check version installed
 ```{r}
-# library(knitr)
-# source("http://www.Bioconductor.org/biocLite.R")
-# biocLite("BiocUpgrade")
-install.packages("seqinr")
-install.packages("rentrez")
-# I can now source my functions and call them! Set the working directory to the top
-# level of the project.
-# To call the function, do: 
-source("R/MakeQsubs.R")
-source("R/RemoveQsubTempFiles.R")
-source("R/PrinSeqProc.R")
+library(knitr)
 ```
+
+This will help us when finding our files to source functions:
+```{r}
+install.packages("rprojroot")
+library(rprojroot)
+# We specify ours is an RStudio project
+# The root object contains a function that will help us locate our package r files
+# regarless of our current working directory
+root <- rprojroot::is_rstudio_project
+scriptsPath <- root$make_fix_file(".")("R")
+scripts <- dir(root$find_file("R", path = root$find_file()))
+scriptsl <- paste(scriptsPath, scripts, sep = "//")
+lapply(scriptsl, source)
+```
+
 
 User: 
 Define the path to the shared folder where the main working directory will be.
@@ -127,7 +129,6 @@ starPath         <- "/opt/bio/STAR/STAR"
 ```
 
 
-
 The user does not alter the variables below. The following chunk will integrate 
 the user-defined variables from the previous chunk into the script.
 ```{r}
@@ -196,10 +197,6 @@ cmd <- with(metadata, paste("cp ",
 prefix <- "A_copy_unzip" 
 suffix <- ".sub"
 MakeQsubs(cmd, prefix, suffix)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
 ```
 
 
@@ -232,10 +229,6 @@ cmd <- MakePrinSeqGraphFiles(metadata, metadata$RawFastq, prefix,
 
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix, suffix)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
 ```
 
 To remove the output files after you are done:
@@ -261,10 +254,6 @@ cmd <- MakePrinSeqHTML(metadata, prefix, metadata$RawGraphName)
 
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix2, suffix)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
 ```
 
 To remove the output files after you are done:
@@ -338,10 +327,6 @@ cmd = with(metadata,
 
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix, suffix)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
 ```
 
 Add name of quality-filtered reads .fastq files to the metadata 
@@ -381,10 +366,6 @@ cmd <- MakePrinSeqGraphFiles(metadata, metadata$processed1Fastq,
 
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix2, suffix)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
 ```
 
 To remove the output files after you are done:
@@ -411,10 +392,6 @@ cmd <- MakePrinSeqHTML(metadata, prefix, metadata$processed1GraphName)
 
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix3, suffix)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
 ```
 
 To remove the output files after you are done:
@@ -446,10 +423,6 @@ cmd <- with(metadata,
 
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix, suffix)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
 ```
 
 To remove the output files after you are done:
@@ -484,10 +457,6 @@ cmd <- MakePrinSeqGraphFiles(metadata, metadata$processed2Fastq,
 
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix2, suffix)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
 ```
 
 
@@ -512,11 +481,6 @@ cmd <- with(metadata, paste("gzip ",
 
 # suffix <- ".sub"  
 # MakeQsubs(cmd, prefix3, suffix)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
-
 ```
 
 
@@ -546,10 +510,6 @@ cmd <- MakePrinSeqHTML(metadata, prefix, metadata$processed2GraphName)
 
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix4, suffix)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
 ```
 
 
@@ -589,10 +549,6 @@ cmd <- with(metadata,
 
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix, suffix)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
 ```
 
 To remove the output files after you are done:
@@ -619,10 +575,6 @@ cmd <- MakePrinSeqGraphFiles2(metadata, metadata$processed3Fastq,
 
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix2, suffix)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
 ```
 
 
@@ -651,10 +603,6 @@ cmd <- MakePrinSeqHTML(metadata, prefix, metadata$processed3GraphName)
 
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix3, suffix)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
 ```
 
 To remove the output files after you are done:
@@ -691,10 +639,6 @@ cmd <- with(metadata,
 
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix, suffix)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
 ```
 
 
@@ -723,10 +667,6 @@ cmd <- MakePrinSeqGraphFiles2(metadata, metadata$processed4Fastq,
 
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix2, suffix)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
 ```
 
 Add name of Dust and MinLen filtered reads .gd files to the metadata tabel:
@@ -754,18 +694,12 @@ cmd <- MakePrinSeqHTML(metadata, prefix, metadata$processed4GraphName)
 
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix3, suffix)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
 ```
 
 To remove the output files after you are done:
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix3)
 ```
-
-
 
 
 Reads show strong bimodal GC content distribution - suggestive of contamination
@@ -821,25 +755,26 @@ cmd <- with(metadata,
 
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix, suffix)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
+```
 
-# To remove the output files after you are done:
+To remove the output files after you are done:
+```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
+```
 
 
-# Add the name of the contaminant/bad range gc to metadata (can remove later, 
-# or adjust):
+Add the name of the contaminant/bad range gc to metadata (can remove later, 
+or adjust):
+```{r}
 for(k in 1:nrow(metadata)){
   metadata$processed5.GC35minusFastq <- paste(metadata$LibraryName, 
                                              ".5processed.GCrange35minus.fastq",
                                              sep = "") 
 }
+```
 
-
-# Generate PrinSeq graph files (.gd) for the fastq generated the previously:
+Generate PrinSeq graph files (.gd) for the fastq generated the previously:
+```{r}
 prefix2 <- "G2_PrinSeqGCRangegraphs35"
 
 cmd <- MakePrinSeqGraphFiles2(metadata, metadata$processed5.GC35minusFastq,
@@ -847,37 +782,38 @@ cmd <- MakePrinSeqGraphFiles2(metadata, metadata$processed5.GC35minusFastq,
 
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix2, suffix)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
+```
 
-# To remove the output files after you are done:
+To remove the output files after you are done:
+```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix2)
+```
 
-# Add the name of the .gd graph files to the metadata table
+Add the name of the .gd graph files to the metadata table
+```{r}
 for(k in 1:nrow(metadata)){
   metadata$processed5.GC35minusGraphName <- paste(metadata$LibraryName, 
                                                   ".5processed.GCrange35minus.gd",
                                                   sep = "") 
 }
+```
 
-# Generate html from the .gd graph files:
+Generate html from the .gd graph files:
+```{r}
 prefix3 <- "G3_PrinSeq_html35"
 
 cmd <- MakePrinSeqHTML(metadata, prefix, metadata$processed5.GC35minusGraphName)
 
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix3, suffix)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
+```
 
-# To remove the output files after you are done:
+To remove the output files after you are done:
+```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix3)
+```
 
-
+```{r}
 nameMetadata <- "Lachnellula_willkommii_WholeGen_metatdata.csv"
 write.table(metadata,
             file = file.path(sharedPathAn, nameMetadata),
@@ -888,10 +824,8 @@ write.table(metadata,
 ```
 
 
-
+Blast qsub ncbi subset:
 ```{r}
-
-# Blast qsub ncbi subset:
 ncbiDbPath     <- "/isilon/biodiversity/reference/ncbi/blastdb/reference/nt/nt"
 ncbiBlastnPath <- "/opt/bio/ncbi-blast+/bin/blastn"
 testGenSubset  <- paste(pathFastq, "wholeGen_Lawii.5processed.GCrange35plus.test.fasta",
@@ -918,18 +852,10 @@ cmd <- paste(ncbiBlastnPath,
 prefix <- "testContamLachnWill_35plus"
 suffix <- ".sub" 
 MakeQsubs(cmd, prefix, suffix, node)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
-
-
-
 ```
 
 Try to assemble the mitochondrial genome - Newbler:
 ```{r}
-
 newblerPath <- "/opt/bio/454/bin/newbler"
 runAssPath  <- "/opt/bio/454/bin/runAssembly"
 
@@ -941,11 +867,6 @@ cmd <- with(metadata,
 prefix <- "Assembly1_NewblerAllGCrange"                
 suffix <- ".sub" 
 MakeQsubs(cmd, prefix, suffix, node)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
-
 ````
 
 Make a fasta file that has only contig00001 (largest contig assembled with Newbler), 
@@ -1012,7 +933,7 @@ cmd <- paste(samtools1Path,
 system(cmd)
 ```
 
-Redo assemble with Newbler on the read set that has mitochondrial reads removed:
+Redo assembly with Newbler on the read set that has mitochondrial reads removed:
 ```{r}
 
 newblerPath <- "/opt/bio/454/bin/newbler"
@@ -1024,11 +945,19 @@ cmd <- with(metadata, paste(runAssPath,
 prefix <- "Assembly2_NewblerNoMito"                
 suffix <- ".sub" 
 MakeQsubs(cmd, prefix, suffix, node)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
 ````
+
+Redo assembly with Newbler on the mitochondrial sequence contig0001. 
+Assemble all reads from wholeGen_Lawii.5processed.fastq to contig0001.
+```{r}
+cmd <- paste(runAssPath,
+             " -o ", paste(pathFastq, "Assembly3_Mitochondrial", sep = ""),
+             " ", paste(pathFastq, "Geneious_Used_Reads_mitochondrial-mapped_to_contig01.fasta", sep = ""),
+             sep = "")
+prefix <- "Assembly3_Mitochondrial"                
+suffix <- ".sub" 
+MakeQsubs(cmd, prefix, suffix, node)
+```
 
 Get the ITS sequence? FungalITSextractor perl script:
 1st: get fasta file from fastq:
@@ -1040,10 +969,6 @@ cmd <- paste(" seqtk fq2fa ", pathLawiiNoMito, " > ",
 prefix <- "fastq2fasta_NoMito"                
 suffix <- ".sub" 
 MakeQsubs(cmd, prefix, suffix, node)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
 ```
 
 2nd: Use fasta in ITSx perl script (remake of FungalITSextractor.pl):
@@ -1062,104 +987,9 @@ cmd <- paste(" perl /opt/bio/ITSx/bin/ITSx ",
 prefix <- "ITSx_3"                
 suffix <- ".sub" 
 MakeQsubs(cmd, prefix, suffix, node)
-################################################################################
-#####  ***** SUBMIT BASH FILE FROM HEAD NODE, AND WAIT FOR COMPLETION ****######
-#####          watch output from this command in the console              ######
-################################################################################
 ```
-
-
-
-
-
-
-
-
-
-
-
-Ignore stuff below - switch to fixing Andre's script for identification
 
 ```{r}
-# genBankMito <- c("NC_023540.1", "NC_001329.3", "NC_023127.1", "NC_008068.1", 
-#                  "KC683708.1", "NC_010222.1", "NC_004514.1", "NC_016680.1", 
-#                  "NC_025200.1", "NC_017930.1", "NC_007445.1","NC_001326.1", 
-#                  "NC_009493.1", "NC_008248.1", "NC_023268.1")
+system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
+RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
-
-Setting up barcode sequence references:
-Querying the NCBI Database via R
-http://a-little-book-of-r-for-bioinformatics.readthedocs.io/en/latest/src/chapter3.html
-```{r}
-library("seqinr")
-choosebank() 
-choosebank("genbank")
-getType()
-orderHelotialesList <- query("orderHelotiales", "SP=helotiales", verbose = TRUE, invisible = FALSE)
-orderHelotialesrRNA <- query("orderHelotiales", "SP=helotiales AND M=rrna", verbose = TRUE, invisible = FALSE)
-orderHelotialesmRNA <- query("orderHelotiales", "SP=helotiales AND M=mrna", verbose = TRUE, invisible = FALSE)
-orderHelotialesITS  <- query("orderHelotiales", "SP=helotiales AND K=internal transcribed spacer", verbose = TRUE, invisible = FALSE)
-orderHelotialesLSU  <- query("orderHelotiales", "SP=helotiales AND K=LSU", verbose = TRUE, invisible = FALSE)
-# orderHelotialestRNA <- query("orderHelotiales", "SP=helotiales AND M=trna", verbose = TRUE, invisible = FALSE)
-
-length(orderHelotialesList)
-temp <- sapply(orderHelotialesList$req[1:10], getName, as.string = TRUE) 
-temprRNA <- sapply(orderHelotialesrRNA$req, getName, as.string = TRUE) 
-tempmRNA <- sapply(orderHelotialesmRNA$req[1:10], getName, as.string = TRUE)
-tempITS  <- sapply(orderHelotialesITS$req, getName, as.string = TRUE)
-tempLSU  <- sapply(orderHelotialesLSU$req, getName, as.string = TRUE)
-
-
-
-
-annotHelITS <- getAnnot(orderHelotialesITS$req[[1]])
-accession   <- annotHelITS[4]
-definition  <- annotHelITS[2]
-
-metadataAnnot$Accession <- data.frame(annotHelITS[3])
-
-tempAll  <- c(tempITS, tempLSU)
-length(tempAll)
-unique(tempAll)
-
-metadata <- data.frame(tempAll)
-colnames(metadata)[1] <- "Accession"
-
-install.packages("mygene") # package ‘mygene’ is not available (for R version 3.1.0)
-
-# I want to make a metadata table with the following columns for each accession (to write table).
-goGeneTerms <- c("Feature", "start", "end", "gene", "taxonID", "gID", "product", "Sequence",
-                 "Species", "aaSequence")
-i <- 1
-for(i in 1:nrow(metadata)){
-    queryMatch <- paste('"AC=', metadata$Accession, '"', sep = "")
-    temp1 <- query("temp1", queryMatch, verbose = TRUE, invisible = FALSE )
-    metadata$Sequence <- sapply(temp1$req, getSequence, as.string = TRUE)
-    }
-
-
-# queryAll <- query("queryAll", )
-
-# tempLSU  <- sapply(orderHelotialesLSU$req, getSequence, as.string = TRUE)
-
-
-# get a union of the lists made
-
-
-
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
