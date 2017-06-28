@@ -928,319 +928,72 @@ for(k in 1:nrow(metadata)){
 }
 ```
 
-
-To remove the output files after you are done:
-```{r}
-
-RemoveQsubTempFiles(sharedPathAn, prefix2)
-
-```
-
-4-3.
-PrinSeq graph reports of third-stage html file generation:
-```{r}
-prefix3 <- "D3_PrinSeq_html"
-
-cmd <- MakePrinSeqHTML(metadata, prefix, metadata$processed2GraphName)
-
-suffix <- ".sub"  
-MakeQsubs(cmd, prefix3, suffix)
-```
-
-To remove the output files after you are done:
-```{r}
-RemoveQsubTempFiles(sharedPathAn, prefix3)
-```
-
-
-Reads show strong bimodal GC content distribution - suggestive of contamination
-To investigate possible contaminating species, will blastn a small subset of
-the fastq reads to see where the strongest matches are.
-```{r}
-
-# 1. Convert fastq to fasta:
-# seqtk fq2fa wholeGen_Lawii.5processed.fastq.gz > wholeGen_Lawii.5processed.test.fasta
-
-```
-
-```{r}
-
-# 2. Split fasta to get a smaller set to blast:
-
-# awk 'BEGIN {n_seq=0;} /^>/ {if(n_seq%1000==0){file=sprintf("myseq%d.fa",n_seq);} 
-# print >> file; n_seq++; next;} { print >> file; }' < sequences.fa
-
-```
-
-```{r}
-# Alternate option of checking contaminants: parse fastq reads by GC content
-# using PrinSeq:
-
-cmd <- paste("perl ", prinSeqPath, " -h", sep = "")
-system(cmd)
-
-rangeGC <- "10-35"
-
-prefix <- "G_PrinSeqDustGCRange35"
-
-cmd <- with(metadata, 
-            paste("zcat ", pathFastq, processed4Fastq, ".gz", " | ",
-                  prinSeqPath,
-                  " -fastq stdin ",
-                  " -range_gc ",       rangeGC,
-                  " -out_good stdout ",
-                  " -out_bad  ",        paste(pathFastq, LibraryName, 
-                                              ".5processed.GCrange35plus", 
-                                              sep = ""),
-                  " -verbose ",
-                  " -no_qual_header ",
-                  " -log ",             paste(sharedPathAn, prefix, "/", 
-                                              LibraryName, 
-                                              ".5processed.GCrange.log", 
-                                              sep = ""),
-                  " |  gzip > ", paste(pathFastq, LibraryName,
-                                       ".5processed.GCrange35minus.fastq.gz", 
-                                       sep = ""), 
-                  sep = ""))
-
-
-suffix <- ".sub"  
-MakeQsubs(cmd, prefix, suffix)
-```
-
-To remove the output files after you are done:
-```{r}
-RemoveQsubTempFiles(sharedPathAn, prefix)
-```
-
-
-Add the name of the contaminant/bad range gc to metadata (can remove later, 
-or adjust):
-```{r}
-for(k in 1:nrow(metadata)){
-  metadata$processed5.GC35minusFastq <- paste(metadata$LibraryName, 
-                                             ".5processed.GCrange35minus.fastq",
-                                             sep = "") 
-}
-```
-
-Generate PrinSeq graph files (.gd) for the fastq generated the previously:
-```{r}
-prefix2 <- "G2_PrinSeqGCRangegraphs35"
-
-cmd <- MakePrinSeqGraphFiles2(metadata, metadata$processed5.GC35minusFastq,
-                             prefix, "5processed.GCrange35minus")
-
-suffix <- ".sub"  
-MakeQsubs(cmd, prefix2, suffix)
-```
-
 To remove the output files after you are done:
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix2)
-```
-
-Add the name of the .gd graph files to the metadata table
-```{r}
-for(k in 1:nrow(metadata)){
-  metadata$processed5.GC35minusGraphName <- paste(metadata$LibraryName, 
-                                                  ".5processed.GCrange35minus.gd",
-                                                  sep = "") 
-}
-```
-
-Generate html from the .gd graph files:
-```{r}
-prefix3 <- "G3_PrinSeq_html35"
-
-cmd <- MakePrinSeqHTML(metadata, prefix, metadata$processed5.GC35minusGraphName)
-
-suffix <- ".sub"  
-MakeQsubs(cmd, prefix3, suffix)
-```
-
-To remove the output files after you are done:
-```{r}
-RemoveQsubTempFiles(sharedPathAn, prefix3)
-```
-
-```{r}
-nameMetadata <- "Lachnellula_willkommii_WholeGen_metatdata.csv"
-write.table(metadata,
-            file = file.path(sharedPathAn, nameMetadata),
-            sep       = ",",
-            row.names = TRUE, 
-            col.names = NA, 
-            quote     = FALSE)
-```
-
-
-Blast qsub ncbi subset:
-```{r}
-ncbiDbPath     <- "/isilon/biodiversity/reference/ncbi/blastdb/reference/nt/nt"
-ncbiBlastnPath <- "/opt/bio/ncbi-blast+/bin/blastn"
-testGenSubset  <- paste(pathFastq, "wholeGen_Lawii.5processed.GCrange35plus.test.fasta",
-                        sep = "")
-blastnOutFrmt  <- paste(" '", 
-                        "6", " qseqid", " sallacc", " pident", " length", 
-                        " mismatch", " gapopen", " qstart", " qend", " sstart", 
-                        " send", " evalue", " bitscore", 
-                        "'",
-                        sep = "") 
-maxTargetsSeqs <- 1
-
-cmd <- paste(ncbiBlastnPath,
-             " -db ",     ncbiDbPath,
-             " -query ",  testGenSubset,
-             " -max_target_seqs ", maxTargetsSeqs,
-             " -outfmt ", blastnOutFrmt,
-             " -out ",    paste(testGenSubset, ".bls",
-                                sep = ""),
-             sep = "")
-
-
-
-prefix <- "testContamLachnWill_35plus"
-suffix <- ".sub" 
-MakeQsubs(cmd, prefix, suffix, node)
-```
-
-Try to assemble the mitochondrial genome - Newbler:
-```{r}
-newblerPath <- "/opt/bio/454/bin/newbler"
-runAssPath  <- "/opt/bio/454/bin/runAssembly"
-
-cmd <- with(metadata,
-            paste(runAssPath,
-                  " -o ", paste(pathFastq, "Assembly1_NewblerAllGCrange", sep = ""),
-                  " ", pathFastq, processed4Fastq,
-                  sep = ""))
-prefix <- "Assembly1_NewblerAllGCrange"                
-suffix <- ".sub" 
-MakeQsubs(cmd, prefix, suffix, node)
-```
-
-Make a fasta file that has only contig00001 (largest contig assembled with Newbler), 
-this appears to be our mitochondrial genome sequence as a blast of this resulted 
-in hits to mitochondrial genomes of related species in the helotiales.
-```{r}
-allContigsPath  <- paste(pathFastq, "projdir-NewblerAssembly_of_wholeGen_Lawii5processed_AllGCrange/NewblerAllGCrange/454AllContigs.fna", sep = "")
-allContigs      <- readAAStringSet(paste(allContigsPath), format = "fasta")
-allContigsNames <- names(allContigs)
-mitoContigName  <- subset(allContigsNames, grepl("contig00001", allContigsNames))
-mitoContigSub   <- allContigs[which(names(allContigs) %in% mitoContigName)]
-writeXStringSet(mitoContigSub, file=paste(pathFastq, "mitoRef.fasta", sep=""), append=FALSE, format="fasta")
-
-pathMitofasta   <- paste(pathFastq, "mitoRef.fasta", sep="") 
-
-```
-
-Build a bowtie2 reference index for the mitochondrial genome contig:
-```{r}
-
-bowind <- "mitoRef"
-
-cmd    <- paste(bowtie2BuildPath, 
-                " -f ", pathMitofasta,
-                " ", paste(pathFastq, bowind, sep = ""),
-                sep = "")
-system(cmd)
-
-```
-
-Map reads against the mitochondrial reference and extract unmapped reads,
-these will be the nuclear genome reads set (non-contaminants), to a new fastq 
-file (no_mito.fastq) direclty with the --un flag:
-```{r}
-
-bowtie2alignPath <- "/opt/bio/bowtie2/bowtie2"
-
-cmd <- with(metadata,
-            paste(bowtie2alignPath,
-                  " --un ", paste(pathFastq, "noMito", "_", processed4Fastq, 
-                                  sep = ""),
-                  " -x ",   paste(pathFastq, bowind, sep = ""),
-                  " -U ",   paste(pathFastq, processed4Fastq, sep = ""),
-                  " -S ",   paste(pathFastq, "mitoContaminantsAlignment.sam", 
-                                  sep = ""),
-                  #" --no-hd ",
-                  #" --no-sq ",
-                  sep = ""
-                  ))
-system(cmd)
-
-pathLawiiNoMito <- paste(pathFastq, "noMito", "_", metadata$processed4Fastq, sep = "")
-
-# or:
-# pathLawiiNoMito <- paste(pathFastq, "noMito_wholeGen_Lawii.5processed.fastq", sep = "")
-
-cmd <- paste(samtools1Path,
-             " view ",
-             " -f 4 ", paste(pathFastq, "mitoContaminantsAlignment.sam", 
-                             sep = ""),
-             " > ",    paste(pathFastq, "noMito_wholeGen_Lawii.5processed", 
-                             ".sam", sep = ""),
-             sep = "")
-system(cmd)
-```
-
-Redo assembly with Newbler on the read set that has mitochondrial reads removed:
-```{r}
-
-newblerPath <- "/opt/bio/454/bin/newbler"
-runAssPath  <- "/opt/bio/454/bin/runAssembly"
-
-cmd <- with(metadata, paste(runAssPath,
-                  " -o ", paste(pathFastq, "Assembly2_NewblerNoMito", sep = ""),
-                  " ",    pathLawiiNoMito, sep = ""))
-prefix <- "Assembly2_NewblerNoMito"                
-suffix <- ".sub" 
-MakeQsubs(cmd, prefix, suffix, node)
-```
-
-Redo assembly with Newbler on the mitochondrial sequence contig0001. 
-Assemble all reads from wholeGen_Lawii.5processed.fastq to contig0001.
-```{r}
-cmd <- paste(runAssPath,
-             " -o ", paste(pathFastq, "Assembly3_Mitochondrial", sep = ""),
-             " ", paste(pathFastq, "Geneious_Used_Reads_mitochondrial-mapped_to_contig01.fasta", sep = ""),
-             sep = "")
-prefix <- "Assembly3_Mitochondrial"                
-suffix <- ".sub" 
-MakeQsubs(cmd, prefix, suffix, node)
-```
-
-Get the ITS sequence? FungalITSextractor perl script:
-1st: get fasta file from fastq:
-```{r}
-cmd <- paste(" seqtk fq2fa ", pathLawiiNoMito, " > ", 
-             paste(pathFastq, "noMito_wholeGen_Lawii.5processed.fasta", sep = ""),
-             sep = "")
-
-prefix <- "fastq2fasta_NoMito"                
-suffix <- ".sub" 
-MakeQsubs(cmd, prefix, suffix, node)
-```
-
-2nd: Use fasta in ITSx perl script (remake of FungalITSextractor.pl):
-```{r}
-#fungalITSpath <- "/opt/bio/FungalITSextractor/FungalITSextractor.pl"
-itsxPath      <- "/opt/bio/ITSx/bin/ITSx"
-cmd <- paste(" perl /opt/bio/ITSx/bin/ITSx ",
-             " -i ", paste(pathFastq, "noMito_wholeGen_Lawii.5processed.fasta", sep = ""),
-             " -t F ",      # F here is to specify fungal
-             " --save_regions all ", # This says I want all outputs, not just ITS 1 and 2
-             " --table T ", # This is because I want a tble (True)
-             " --cpu 6 ",   # To run this in parallel
-             sep = "")
-             
-
-prefix <- "ITSx_3"                
-suffix <- ".sub" 
-MakeQsubs(cmd, prefix, suffix, node)
 ```
 
 ```{r}
 system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
-RemoveQsubTempFiles(sharedPathAn, prefix)
+# RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
+
+Assembling de novo:
+ABySS
+IDBA-UD
+SOAPdenovo(SOAP)
+SPAdes
+SpareseAssembler(Sparse)
+Velvet
+```{r}
+pathkmerGenie <- "/home/CFIA-ACIA/girouxeml/prog/kmergenie-1.7044/kmergenie"
+pathABYSS <- "/opt/bio/abyss/bin/ABYSS"
+pathIDBAud <- "/opt/bio/idba/bin/idba_ud"
+pathSOAPdenovo <- "opt/bio/SOAPdenovo2/SOAPdenovo-63mer"
+pathVelvet <- "/opt/bio/velvet/"
+```
+
+```{r}
+prefix <- "kmerGenie1"
+
+cmd <- paste(pathABYSS, " --help", sep = "")
+cmd <- paste(pathkmerGenie, " --help", sep = "")
+system(cmd)
+
+cmd <- with(metadata,paste(pathkmerGenie, " ", pathFastq, processed2Fastq, ".gz", 
+                           " -o ", LibraryName, sep = ""))
+
+suffix <- ".sub"  
+MakeQsubs(cmd, prefix, suffix)
+
+```
+
+```{r}
+prefix2 <- "Assembly_ABySS"
+
+cmd <- with(metadata,paste(pathABYSS, " -k 61", paste(pathFastq, processed2Fastq, ".gz", 
+                           " -o ", LibraryName, sep = ""))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
