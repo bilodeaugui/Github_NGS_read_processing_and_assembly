@@ -1063,7 +1063,7 @@ and then blasting the ABySS assembly fastqs for all the genomes against it:
 
 # To Blast against it:
 
-# blastn -query /home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Assembly_ABySS/kmer_81_Lawi_IonT_Debbie_1.fastq -db /home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_willkommii_GenomeAn/IonTorrent_data_Debbie1/Assembly1_NewblerAllGCrange/454AllContigs.fna -out ./Lawii_454AllContigs.blastn -outfmt '6 qseqid sseqid stitle pident length mismatch gapopen qstat qend sstart send evalue bitscore' -num_threads $(nproc) -max_target_seqs 1
+# blastn -query /home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Assembly_ABySS/kmer_81_Lawi_IonT_Debbie_1.fastq -db /home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_willkommii_GenomeAn/IonTorrent_data_Debbie1/Assembly1_NewblerAllGCrange/454AllContigs.fna -out ./Lawii_454AllContigs.blastn -outfmt '6 qseqid sseqid stitle pident length mismatch gapopen qstart qend sstart send evalue bitscore' -num_threads $(nproc) -max_target_seqs 1
 
 prefix <- "LawiiMitodbBlast"
 
@@ -1072,10 +1072,11 @@ for(k in 1:nrow(metadataAssembly)){
                  "-query ", metadataAssembly$NewblerFnaPath,
                  " -db ", paste(sharedPath, "data/Lachnellula_willkommii/Final_Sequences/Mitochondrial_from_contig00001.fasta", sep = ""),
                  " -out ", paste("./", metadataAssembly$LibraryName, "_454AllContigs.blastn", sep = ""),
-                 " -outfmt ", "'6 qseqid sseqid stitle pident length mismatch gapopen qstat qend sstart send evalue bitscore' -num_threads $(nproc) -max_target_seqs 1",
+                 " -outfmt ", "'6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore' -num_threads $(nproc) -max_target_seqs 1",
                  sep = "")
 }
-
+suffix <- ".sub"  
+MakeQsubs(cmd, prefix, suffix)
 ```
 
 Get the ABySS assembly contiguity metrics
@@ -1168,7 +1169,7 @@ newblerPath <- "/opt/bio/454/bin/newbler"
 runAssPath  <- "/opt/bio/454/bin/runAssembly"
 
 prefix <- "Assembly_Newbler"
-
+prefix2 <- "Assembly_NewblerQsub_Lari_only" # for re-running Newbler on L. arida, there was an error on first run try.
 for(i in 1:nrow(metadataAssembly)){
     cmd <- with(metadataAssembly, 
                 paste(runAssPath, 
@@ -1176,11 +1177,12 @@ for(i in 1:nrow(metadataAssembly)){
                       " ",    paste(metadataAssembly$finalProcessedPath, sep = ""), 
                       sep = ""))
 }
-    
+cmd[1] # cmd to re-run Lari only due to previous run crash   
 suffix <- ".sub" 
 MakeQsubs(cmd, prefix, suffix)
+# MakeQsubs(cmd[1], prefix2, suffix) # For re-running Lari due to previous run crash.
 ```
-
+* Not done yet for the repeat Lari qsub assembly
 To remove the output files after you are done:
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
@@ -1193,6 +1195,7 @@ for(k in 1:nrow(metadataAssembly)){
 }
 ```
 
+* Not done yet because Lari still assembling
 Must first gzip the fastq after Newbler assembly to save space!
 ```{r}
 prefix <- "GZipAfterNewbler"
@@ -1238,7 +1241,7 @@ for(k in 1:nrow(metadataAssembly)){
                                           metadataAssembly$LibraryName, "/scaffolds.fasta", sep = "")
 }
 ```
-
+* Not done for Lari yet
 quast to evaluate assemblies
 ```{r}
 pathQuast <- "/opt/bio/quast/quast.py"
@@ -1300,7 +1303,7 @@ Advanced options:
 -h  --help                            Print this message
 
 
-
+Doesn't work:
 ```{r}
 cmd <- paste(pathIDBAud, " --help", sep = "")
 system(cmd)
@@ -1352,6 +1355,7 @@ Allowed Options:
       --no_correct                       do not do correction
       --pre_correction                   perform pre-correction before assembly
 
+* Not Done for Lari yet
 ```{r}
 library(Biostrings)
 i <- 1
@@ -1374,7 +1378,7 @@ for(i in 1:length(ID_fasta_files)){
 }
 ```
 
-
+* Done
 This is to see about contaminating sequence profile using Kraken, with Krona for visualization.
 ```{r}
 pathKraken <- "/home/CFIA-ACIA/girouxeml/prog/kraken/kraken"
@@ -1389,10 +1393,10 @@ cmd <- with(metadataAssembly,
                   " --preload ",
                   " --db ", krakenDB,
                   " --fastq-input",
-                  #" --threads 12 ",
+                  " --threads 12 ",
                   " --output ", paste(pathKrakenTests, "krakenTesting_", 
                                       metadataAssembly$LibraryName, ".output", sep = ""),
-                  " ", paste(metadataAssembly$finalProcessedPath, ".gz", sep = ""),
+                  " ", paste(metadataAssembly$finalProcessedPath, sep = ""),
                   sep = ""))
 
 # Note, if there are a lot of qsubs to run, some may terminate due to lack of
@@ -1403,7 +1407,143 @@ cmd <- with(metadataAssembly,
 # So far, one of the 6, L. ari will need to be resubmitted because of this.
 
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
-
 ```
+* Done
+Clean-up step: Remove the output files while keeping the qsub and bash file:
+```{r}
+system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+* Done
+To add the kraken output files to the metadata table:
+```{r}
+for(k in 1:nrow(metadataAssembly)){
+  metadataAssembly$KrakenOutput <- paste("krakenTesting_", metadataAssembly$LibraryName, ".output", sep = "") 
+}
+```
+* Done
+For users who want the full taxonomic name associated with each input sequence, 
+use kraken-translate to produce two different output formats for classified sequences. 
+The script operates on the output of kraken, like so: 
+kraken-translate --db $DBNAME sequences.kraken > sequences.labels
+```{r}
+
+prefix <- "krakenTranslateQsubs"
+pathKrakenTranslate <- "/home/CFIA-ACIA/girouxeml/prog/kraken/kraken-translate"
+
+cmd <- with(metadataAssembly,
+            paste(pathKrakenTranslate,
+                  " --db ", krakenDB,
+                  " ", paste(pathKrakenTests, metadataAssembly$KrakenOutput, sep = ""),
+                  " > ", paste(pathKrakenTests, "krakenTesting_", metadataAssembly$LibraryName,
+                               ".labels", sep = ""),
+                  sep = ""))
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+
+* Done
+Clean-up step: Remove the output files while keeping the qsub and bash file:
+```{r}
+system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+* Done
+To add the kraken output files to the metadata table:
+```{r}
+for(k in 1:nrow(metadataAssembly)){
+  metadataAssembly$KrakenOutputLabels <- paste("krakenTesting_", metadataAssembly$LibraryName, ".labels", sep = "") 
+}
+```
+
+* Done
+After blasting our sequences against our Kraken database, we tabulate the results using the following:
+```{r}
+prefix <- "krakenReportQsubs"
+pathKrakenResults <- "/home/CFIA-ACIA/girouxeml/prog/kraken/kraken-report"
+
+cmd <- with(metadataAssembly,
+            paste(pathKrakenResults,
+                  " --db ", krakenDB,
+                  " ", paste(pathKrakenTests, metadataAssembly$KrakenOutput, sep = ""),
+                  " > ", paste(pathKrakenTests, "krakenTesting_", metadataAssembly$LibraryName,
+                               ".report", sep = ""),
+                  sep = ""))
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+* Done
+Clean-up step: Remove the output files while keeping the qsub and bash file:
+```{r}
+system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+* Done
+To visualize the kraken data, we can use krona:
+```{r}
+prefix <- "KrakenToKronaInFormatQsub-outputIn"
+pathKronaImportTax <- "/home/CFIA-ACIA/girouxeml/prog/bin/ktImportTaxonomy"
+
+cmd <- with(metadataAssembly,
+            paste("cut -f2,3 ", 
+                  paste(pathKrakenTests, metadataAssembly$KrakenOutput, sep = ""),
+                  " > ", 
+                  paste(pathKrakenTests, "krona_outputIn_", metadataAssembly$LibraryName, ".in", sep = ""),
+                  sep = ""))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+* Done
+Clean-up step: Remove the output files while keeping the qsub and bash file:
+```{r}
+system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+* Done
+To add the kraken output files to the metadata table:
+```{r}
+for(k in 1:nrow(metadataAssembly)){
+  metadataAssembly$KronaIn <- paste("krona_outputIn_", metadataAssembly$LibraryName, ".in", sep = "") 
+}
+```
+
+* Done
+Passing in to krona:
+```{r}
+prefix <- "kronaQsubs_OutputIn"
+pathKronaImportTax <- "/home/CFIA-ACIA/girouxeml/prog/bin/ktImportTaxonomy"
+
+cmd <- with(metadataAssembly,
+            paste(pathKronaImportTax, " ", 
+                  paste(pathKrakenTests, metadataAssembly$KronaIn, sep = ""),
+                  " -o ", 
+                  paste(pathKrakenTests, "krona_outputIn_", metadataAssembly$LibraryName, ".out.html", sep = ""),
+                  sep = ""))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+
+* Done
+Clean-up step: Remove the output files while keeping the qsub and bash file:
+```{r}
+system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
