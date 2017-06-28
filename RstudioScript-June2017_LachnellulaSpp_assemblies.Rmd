@@ -184,6 +184,7 @@ The user does not alter the variables below.
 Sys.setenv(PATH=paste('/opt/gridengine/bin/linux-x64',Sys.getenv('PATH'),sep= ':'))
 ```
 
+
 The following chunk will integrate the user-defined variables from the previous chunk into the script.
 ```{r creating_dir_for_analysis, cache=TRUE}
 # Create the analysis directory:
@@ -244,6 +245,13 @@ if(libraryLayout == 2){
 } else if
 (libraryLayout != 2){
     metadata$BaseCallsName <- paste(metadata$LibraryName, ".fastq", sep = "")
+}
+```
+
+This function will delete qsub temp files that are the sub.e* outputs (error outputs)
+```{r}
+X <- function(path, prefixSub) {
+  system(paste("find ", path, prefixSub, "/", prefixSub, "*", ".sub.e", "*", " -delete ", sep = ""))
 }
 ```
 
@@ -490,11 +498,6 @@ To remove the output files after you are done:
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
-***Over here!!! - now consider doing some merging for paired-end reads?
-```{r}
-
-
-```
 
 Pre-Processing of Raw Reads using PrinSeq::
 
@@ -607,6 +610,7 @@ cmd <- MakePrinSeqGraphFiles(metadata, metadata$processed1Fastq,
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix2, suffix)
 ```
+
 You can follow the progress of the PrinSeq graph generation run with the following:
 ```{r, echo=FALSE, cache=TRUE}
 for(k in 1:nrow(metadata)){
@@ -628,7 +632,6 @@ for(k in 1:nrow(metadata)){
                                         ".2processedRaw.gd",
                                         sep = "") 
 }
-
 ```
 
 1-3.
@@ -675,11 +678,13 @@ cmd <- with(metadata,
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix, suffix)
 ```
+
 (Only for RNA-seq, not genome sequencing)
 To remove the output files after you are done:
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
+
 (Only for RNA-seq, not genome sequencing)
 Add name of Poly-A/T, left and right trimmed reads .fastq files to the 
 metadata tabel:
@@ -802,11 +807,13 @@ cmd <- with(metadata,
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix, suffix)
 ```
+
 (Only for RNA-seq, not genome sequencing)
 To remove the output files after you are done:
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
+
 (Only for RNA-seq, not genome sequencing)
 Add name of 2nd polyAT trimmed reads .fastq files to the 
 metadataAdapRM tabel:
@@ -858,6 +865,7 @@ cmd <- MakePrinSeqHTML(metadata, prefix, metadata$processed3GraphName)
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix3, suffix)
 ```
+
 (Only for RNA-seq, not genome sequencing)
 To remove the output files after you are done:
 ```{r}
@@ -901,6 +909,10 @@ for(k in 1:nrow(metadata)){
   metadata$processed2Fastq <- paste(metadata$LibraryName, ".3processed.fastq",
                                     sep = "") 
 }
+for(k in 1:nrow(metadata)){
+  metadata$finalProcessedPath <- paste(pathFastq, "/", metadata$LibraryName, ".3processed.fastq",
+                                    sep = "") 
+}
 ```
 
 To remove the output files after you are done:
@@ -940,11 +952,12 @@ system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat retu
 
 Assembling de novo:
 ABySS
-IDBA-UD
-SOAPdenovo(SOAP)
+IDBA-UD (can't get it to work, tried with -l option for long reads)
+SOAPdenovo(SOAP) (we won't use this - it's for short reads)
 SPAdes
-SpareseAssembler(Sparse)
-Velvet
+Newbler
+SparseAssembler(Sparse)
+Velvet (we won't use this - it's for short reads)
 ```{r}
 pathkmerGenie <- "/home/CFIA-ACIA/girouxeml/prog/kmergenie-1.7044/kmergenie"
 pathABYSS <- "/opt/bio/abyss/bin/ABYSS"
@@ -953,47 +966,444 @@ pathSOAPdenovo <- "opt/bio/SOAPdenovo2/SOAPdenovo-63mer"
 pathVelvet <- "/opt/bio/velvet/"
 ```
 
+Gather fasta data required for all assemblies:
 ```{r}
-prefix <- "kmerGenie1"
+library(data.table)
+metadata_dt <- as.data.table(metadata)
+setkey(metadata_dt, ScientificName, LibraryName, processed2Fastq, finalProcessedPath)
+
+head(metadata_dt)
+key(metadata_dt)
+metadataAssembly <- metadata_dt[, c("ScientificName", "LibraryName", "processed2Fastq", "finalProcessedPath"), with=FALSE]
+metadataAssemblyLawii <- data.table("ScientificName"=c("Lachnellula_willkommii"),
+                                    "LibraryName"=c("Lawi_IonT_Debbie_1"),
+                                    "processed2Fastq"=c("wholeGen_Lawii.5processed.fastq"),
+                                    "finalProcessedPath"= c(paste(sharedPath,
+                                                            "Lachnellula_willkommii_GenomeAn/IonTorrent_data_Debbie1/wholeGen_Lawii.5processed.fastq",
+                                                            sep = "")))
+metadataAssembly <- rbind(metadataAssembly, metadataAssemblyLawii)
+
+```
+
+```{r}
+prefix <- "kmerGenie"
 
 cmd <- paste(pathABYSS, " --help", sep = "")
 cmd <- paste(pathkmerGenie, " --help", sep = "")
 system(cmd)
 
-cmd <- with(metadata,paste(pathkmerGenie, " ", pathFastq, processed2Fastq, ".gz", 
+cmd <- with(metadataAssembly,paste(pathkmerGenie, " ", finalProcessedPath, ".gz", 
                            " -o ", LibraryName, sep = ""))
 
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix, suffix)
+```
+
+To remove the output files after you are done:
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+Add the best k-mer values identified by kmergenie for each genome and the predicted assembly size:
+```{r}
+pathKmerGenieDat <- paste(sharedPath, analysis, "kmerGenie/", sep = "")
+
+for(k in 1:nrow(metadataAssembly)){
+  metadataAssembly$kmerGenieDat <- paste(metadataAssembly$LibraryName, ".dat", sep = "") 
+  metadataAssembly$kmerGenieDatPath <- paste(pathKmerGenieDat, metadataAssembly$kmerGenieDat, sep = "")
+}
+
+for(i in 1:nrow(metadataAssembly)){
+    kmerdatTmp <- fread(metadataAssembly$kmerGenieDatPath[i], sep = "auto", header = TRUE)
+    setkey(kmerdatTmp, genomic.kmers)
+    key(kmerdatTmp)
+    maxGenomicKmers <- max(kmerdatTmp$genomic.kmers)
+    metadataAssembly$BestKmerGenie[i] <- kmerdatTmp[.(maxGenomicKmers), .(k)]
+}
+```
+
+Assemble with ABySS and the kmer best from kmergenie:
+```{r}
+cmd <- paste(pathABYSS, " --help", sep = "")
+system(cmd)
+
+prefix <- "Assembly_ABySS"
+
+for(i in 1:nrow(metadataAssembly)){
+cmd <- with(metadataAssembly, paste(pathABYSS, " -k ", metadataAssembly$BestKmerGenie, 
+                                    " ", paste(metadataAssembly$finalProcessedPath, ".gz", sep = ""), 
+                                    " -o ", paste("kmer_", metadataAssembly$BestKmerGenie, "_", LibraryName, ".fastq", sep = ""),
+                                    " --coverage-hist ", paste(sharedPath, analysis, prefix, "/",
+                                                               "kmer_", metadataAssembly$BestKmerGenie, "_",
+                                                               LibraryName, ".hist", sep = ""),
+                                    " -v ",
+                                    " -q 10 ",
+                           sep = ""))
+}
+
+
+suffix <- ".sub"  
+MakeQsubs(cmd, prefix, suffix)
+```
+
+Add the names of the genome fastq files assembled with ABySS, and their paths to the metadata table:
+```{r}
+for(k in 1:nrow(metadataAssembly)){
+  metadataAssembly$ABySSfastq <- paste("kmer_", metadataAssembly$BestKmerGenie, "_", metadataAssembly$LibraryName, ".fastq", sep = "")
+  metadataAssembly$ABySSfastqPath <- paste(sharedPath, analysis, "Assembly_ABySS/", metadataAssembly$ABySSfastq, sep = "")
+}
+```
+
+Creating a blast database using previous Lachnellula willkommii genome assembly done with Newbler, 
+and then blasting the ABySS assembly fastqs for all the genomes against it:
+```{r}
+# To make the database:
+
+ # makeblastdb -in /home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_willkommii_GenomeAn/IonTorrent_data_Debbie1/Assembly1_NewblerAllGCrange/454AllContigs.fna -input_type fasta -dbtype nucl -hash_index -parse_seqids
+
+# To Blast against it:
+
+# blastn -query /home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Assembly_ABySS/kmer_81_Lawi_IonT_Debbie_1.fastq -db /home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_willkommii_GenomeAn/IonTorrent_data_Debbie1/Assembly1_NewblerAllGCrange/454AllContigs.fna -out ./Lawii_454AllContigs.blastn -outfmt '6 qseqid sseqid stitle pident length mismatch gapopen qstat qend sstart send evalue bitscore' -num_threads $(nproc) -max_target_seqs 1
+
+prefix <- "LawiiMitodbBlast"
+
+for(k in 1:nrow(metadataAssembly)){
+    cmd <- paste("blastn ", 
+                 "-query ", metadataAssembly$NewblerFnaPath,
+                 " -db ", paste(sharedPath, "data/Lachnellula_willkommii/Final_Sequences/Mitochondrial_from_contig00001.fasta", sep = ""),
+                 " -out ", paste("./", metadataAssembly$LibraryName, "_454AllContigs.blastn", sep = ""),
+                 " -outfmt ", "'6 qseqid sseqid stitle pident length mismatch gapopen qstat qend sstart send evalue bitscore' -num_threads $(nproc) -max_target_seqs 1",
+                 sep = "")
+}
 
 ```
 
+Get the ABySS assembly contiguity metrics
 ```{r}
-prefix2 <- "Assembly_ABySS"
+pathABYSSfac <- "/opt/bio/abyss/bin/abyss-fac"
 
-cmd <- with(metadata,paste(pathABYSS, " -k 61", paste(pathFastq, processed2Fastq, ".gz", 
-                           " -o ", LibraryName, sep = ""))
+prefix <- "Assembly_ABySS-fac"
+
+for(i in 1:nrow(metadataAssembly)){
+cmd <- with(metadataAssembly, paste(pathABYSSfac, " ", metadataAssembly$ABySSfastqPath, 
+                                    " -v ", sep = ""))
+}
+
+suffix <- ".sub"  
+MakeQsubs(cmd, prefix, suffix)
+```
+
+To remove the error output files after you are done: (we need the sub.o* to gather the stats)
+```{r}
+X(sharedPathAn, prefix)
+```
+
+ABySS Contig stats output format:
+
+Column	Description
+n	    Total number of sequences
+n:500	Number of sequences at least 500 bp
+L50	    Number of sequences at least the N50 size
+LG50	Number of sequences at least the NG50 size
+NG50	Half the genome is in sequences of the NG50 size or larger
+min	    The size of the smallest sequence
+N80	    At least 80% of the assembly is in sequences of the N80 size or larger
+N50	    At least half the assembly is in sequences of the N50 size or larger
+N20	    At least 20% of the assembly is in sequences of the N20 size or larger
+E-size	The sum of the square of the sequence sizes divided by the assembly size
+max	    The size of the largest sequence
+sum	    The sum of the sequence sizes
+name	The file name of the assembly
+```{r}
+library(reshape2)
+pathABySS_fac_results <- paste(sharedPath, analysis, prefix, "/", sep = "")
+list.files(pathABySS_fac_results, Sys.glob("*.sub.o*"))
+listABySS_fac_res <- Sys.glob(file.path(pathABySS_fac_results, "*.sub.o*"))
+
+
+i <- 1
+for(i in 1:length(listABySS_fac_res)){
+    test[[i]] <- fread(listABySS_fac_res[i], sep = "auto", header = TRUE)
+    test[[i]]$ABySSfastq <- basename(test[[i]]$name)
+    print(nrow(test[[i]]))
+}
+
+summary(test)
+View(test[[1]])
+
+library(data.table)
+testList <- list(test[[1]], test[[2]], test[[3]], test[[4]], test[[5]], test[[6]], test[[7]])
+testAll <- Reduce(function(x, y) merge(x, y, all=TRUE), testList)
+
+write.table(testAll, file = file.path(paste(sharedPathAn, analysis, "ABySS_Assembly_Contiguity_Stats_all_genomes.csv", sep = "")),
+            append = FALSE,
+            quote  = FALSE,
+            row.names = FALSE,
+            sep = ",",
+            col.names = TRUE)
+```
+
+Assembling with Newbler
+Must first gunzip the fastq as Newbler can't use compressed files!
+```{r}
+prefix <- "GunZipForNewbler"
+
+for(i in 1:nrow(metadataAssembly)){
+    cmd <- with(metadataAssembly, 
+            paste(" gunzip ", paste(metadataAssembly$finalProcessedPath, ".gz", sep = ""),
+                  sep = ""))
+}
+
+suffix <- ".sub" 
+MakeQsubs(cmd, prefix, suffix)
+```
+
+To remove the output files after you are done:
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+```{r}
+newblerPath <- "/opt/bio/454/bin/newbler"
+runAssPath  <- "/opt/bio/454/bin/runAssembly"
+
+prefix <- "Assembly_Newbler"
+
+for(i in 1:nrow(metadataAssembly)){
+    cmd <- with(metadataAssembly, 
+                paste(runAssPath, 
+                      " -o ", paste(sharedPath, analysis, prefix, "/", metadataAssembly$LibraryName, sep = ""),
+                      " ",    paste(metadataAssembly$finalProcessedPath, sep = ""), 
+                      sep = ""))
+}
+    
+suffix <- ".sub" 
+MakeQsubs(cmd, prefix, suffix)
+```
+
+To remove the output files after you are done:
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+Add the assembled contigs paths from Newbler to the metadata table:
+```{r}
+for(k in 1:nrow(metadataAssembly)){
+  metadataAssembly$NewblerFnaPath <- paste(sharedPath, analysis, "Assembly_Newbler/", metadataAssembly$LibraryName, "/454AllContigs.fna", sep = "")
+}
+```
+
+Must first gzip the fastq after Newbler assembly to save space!
+```{r}
+prefix <- "GZipAfterNewbler"
+
+for(i in 1:nrow(metadataAssembly)){
+    cmd <- with(metadataAssembly, 
+            paste(" gzip ", paste(metadataAssembly$finalProcessedPath, sep = ""),
+                  sep = ""))
+}
+
+suffix <- ".sub" 
+MakeQsubs(cmd, prefix, suffix)
+```
+
+Assembling genomes with SPades:
+```{r}
+pathSpades <- "/home/CFIA-ACIA/girouxeml/prog/SPAdes-3.10.1-Linux/bin/spades.py"
+prefix <- "Assembly_SPAdesMultipleKmers"
+
+for(i in 1:nrow(metadataAssembly)){
+    cmd <- with(metadataAssembly, 
+                paste(pathSpades, " ", 
+                      " --iontorrent ",
+                      " -k ", "21,33,45,57,69,81,93,105,117,127",
+                      " -o ", paste(sharedPath, analysis, prefix, "/", metadataAssembly$LibraryName, sep = ""),
+                      " -s ", metadataAssembly$finalProcessedPath,
+                      sep = "")
+    )
+}
+suffix <- ".sub" 
+MakeQsubs(cmd, prefix, suffix)
+```
+
+To delete the qsub outputs errors only, in case the sub.o* have info we need to gather.
+```{r}
+X(sharedPathAn, prefix)
+```
+
+Add the assembled contigs paths from SPAdes to the metadata table:
+```{r}
+for(k in 1:nrow(metadataAssembly)){
+  metadataAssembly$SPAdesFastaPath <- paste(sharedPath, analysis, "Assembly_SPAdesMultipleKmers/", 
+                                          metadataAssembly$LibraryName, "/scaffolds.fasta", sep = "")
+}
+```
+
+quast to evaluate assemblies
+```{r}
+pathQuast <- "/opt/bio/quast/quast.py"
+
+prefix <- "Assembly_Assessment_Quast"
+
+for(i in 1:nrow(metadataAssembly)){
+    cmd <- with(metadataAssembly, 
+                paste(pathQuast, " ", 
+                      " -o ", paste(sharedPath, analysis, prefix, "/", metadataAssembly$LibraryName, "/", sep = ""),
+                      #" -l ", metadataAssembly$LibraryName,
+                      " -e ", # " -f",
+                      " ", metadataAssembly$ABySSfastqPath, 
+                      " ", metadataAssembly$SPAdesFastaPath, 
+                      " ", metadataAssembly$NewblerFnaPath,
+                      sep = ""))
+}
+
+suffix <- ".sub" 
+MakeQsubs(cmd, prefix, suffix)
+```
+
+To remove the output files after you are done:
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+Usage: python /opt/bio/quast/quast.py [options] <files_with_contigs>
+
+Options:
+-o  --output-dir  <dirname>   Directory to store all result files [default: quast_results/results_<datetime>]
+-R                <filename>  Reference genome file
+-G  --genes       <filename>  File with gene coordiantes in the reference
+-O  --operons     <filename>  File with operon coordiantes in the reference
+    --min-contig  <int>       Lower threshold for contig length [default: 500]
+
+Advanced options:
+-T  --threads      <int>              Maximum number of threads [default: number of CPUs]
+-l  --labels "label, label, ..."      Names of assemblies to use in reports, comma-separated. If contain spaces, use quotes
+-L                                    Take assembly names from their parent directory names
+-f  --gene-finding                    Predict genes (with GeneMarkS from prokaryotes (default), GlimmerHMM
+                                      for eukaryotes (--eukaryote), or MetaGeneMark for metagenomes (--meta)
+-S  --gene-thresholds                 Comma-separated list of threshold lengths of genes to search with Gene Finding module
+                                      [default is 0,300,1500,3000]
+-e  --eukaryote                       Genome is eukaryotic
+-m  --meta                            Metagenomic assembly. Use MetaGeneMark for gene prediction.
+    --est-ref-size <int>              Estimated reference size (for computing NGx metrics without a reference)
+    --gage                            Use GAGE (results are in gage_report.txt)
+-t  --contig-thresholds               Comma-separated list of contig length thresholds [default: 0,1000]
+-s  --scaffolds                       Assemblies are scaffolds, split them and add contigs to the comparison
+-u  --use-all-alignments              Compute genome fraction, # genes, # operons in the v.1.0-1.3 style.
+                                      By default, QUAST filters Nucmer's alignments to keep only best ones
+-a  --ambiguity-usage <none|one|all>  Use none, one, or all alignments of a contig with multiple equally
+                                      good alignments [default is one]
+-n  --strict-NA                       Break contigs in any misassembly event when compute NAx and NGAx
+                                      By default, QUAST breaks contigs only by extensive misassemblies (not local ones)
+
+    --test                            Run QUAST on the data from the test_data folder, output to test_output
+-h  --help                            Print this message
 
 
 
+```{r}
+cmd <- paste(pathIDBAud, " --help", sep = "")
+system(cmd)
+
+prefix8 <- "IDBAudAssembly"
+
+mink <- 21
+maxk <- 96
+stepk <- 10
 
 
+cmd <- with(metadataAssembly, paste(pathIDBAud,
+                                    " -o ", paste(sharedPath, analysis, prefix8, "/", sep = ""),
+                                    " -r ", paste(finalProcessedPath, ".gz", sep = ""),
+                                    " -l ",
+                                    " --mink ", mink,
+                                    " --maxk ", maxk,
+                                    " --step ", stepk, sep = ""
+                                    ))
+MakeQsubs(cmd, prefix8, suffix)
+```
 
 
+Allowed Options:
+  -o, --out arg (=out)                   output directory
+  -r, --read arg                         fasta read file (<=300)
+      --read_level_2 arg                 paired-end reads fasta for second level scaffolds
+      --read_level_3 arg                 paired-end reads fasta for third level scaffolds
+      --read_level_4 arg                 paired-end reads fasta for fourth level scaffolds
+      --read_level_5 arg                 paired-end reads fasta for fifth level scaffolds
+  -l, --long_read arg                    fasta long read file (>300)
+      --mink arg (=20)                   minimum k value (<=312)
+      --maxk arg (=100)                  maximum k value (<=312)
+      --step arg (=20)                   increment of k-mer of each iteration
+      --inner_mink arg (=10)             inner minimum k value
+      --inner_step arg (=5)              inner increment of k-mer
+      --prefix arg (=3)                  prefix length used to build sub k-mer table
+      --min_count arg (=2)               minimum multiplicity for filtering k-mer when building the graph
+      --min_support arg (=1)             minimum supoort in each iteration
+      --num_threads arg (=0)             number of threads
+      --seed_kmer arg (=30)              seed kmer size for alignment
+      --min_contig arg (=200)            minimum size of contig
+      --similar arg (=0.95)              similarity for alignment
+      --max_mismatch arg (=3)            max mismatch of error correction
+      --min_pairs arg (=3)               minimum number of pairs
+      --no_bubble                        do not merge bubble
+      --no_local                         do not use local assembly
+      --no_coverage                      do not iterate on coverage
+      --no_correct                       do not do correction
+      --pre_correction                   perform pre-correction before assembly
+
+```{r}
+library(Biostrings)
+i <- 1
+for(i in 2:nrow(metadataAssembly)){
+    tempFasta <- readDNAStringSet(metadataAssembly$NewblerFnaPath[i], format = "fasta")
+    tempContig1 <- tempFasta[1]
+    names(tempContig1) = sub(" .*", "", names(tempContig1))
+    names(tempContig1) = paste(names(tempContig1), "_", metadataAssembly$LibraryName[i], sep = "")
+    writeXStringSet(tempContig1, 
+                    file = paste(sharedPathAn, "Newbler_Contig1_all_Lachnellula.fasta", sep = ""), 
+                    append = TRUE, 
+                    format = "fasta") 
+}
+
+pathContig1 <- paste(sharedPathAn, "Newbler_Contig1_all_Lachnellula.fasta", sep = "")
+for(i in 1:length(ID_fasta_files)){
+  cmd <- paste("/opt/bio/mafft/bin/mafft --reorder --quiet '",  pathContig1, "' > ", 
+             pathContig1, "_mafft_aligned.fasta", sep = "")
+  system(cmd)
+}
+```
 
 
+This is to see about contaminating sequence profile using Kraken, with Krona for visualization.
+```{r}
+pathKraken <- "/home/CFIA-ACIA/girouxeml/prog/kraken/kraken"
+krakenDB <- "/home/CFIA-ACIA/girouxeml/Kraken_first_DataBase"
 
+dir.create(paste(sharedPathAn, "krakenContaminationTesting", sep = ""), showWarnings=TRUE, recursive=FALSE)
+pathKrakenTests <- paste(sharedPathAn, "krakenContaminationTesting/", sep = "")
 
+prefix <- "kraken_testingQsubs"
+cmd <- with(metadataAssembly,
+            paste(pathKraken,
+                  " --preload ",
+                  " --db ", krakenDB,
+                  " --fastq-input",
+                  #" --threads 12 ",
+                  " --output ", paste(pathKrakenTests, "krakenTesting_", 
+                                      metadataAssembly$LibraryName, ".output", sep = ""),
+                  " ", paste(metadataAssembly$finalProcessedPath, ".gz", sep = ""),
+                  sep = ""))
 
+# Note, if there are a lot of qsubs to run, some may terminate due to lack of
+# available memory to run on the cluster. You can see which ones didn't run 
+# by cd into the directory with the qsubs, and on the command line do:
+# $  find . -type f -exec grep -H 'Cannot allocate memory' {} \;
+# You can then run these separately after the others are complete.
+# So far, one of the 6, L. ari will need to be resubmitted because of this.
 
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 
-
-
-
-
-
-
-
-
+```
 
 
