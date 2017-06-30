@@ -231,6 +231,7 @@ cmd
 
 Below the metadata file specified by the user is copied into the analysis folder and read into R:
 ```{r copy_metadata_to_analysis_dir_and_read, cache=TRUE}
+
 cmd      <- paste("cp ", metadataPath, " ", sharedPathAn, sep = "")
 system(cmd)
 metadata <-  read.table(paste(sharedPathAn, metadataFileAlternate, sep = ""),
@@ -1529,9 +1530,245 @@ system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat retu
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
+Add the names of the blast output files for mitochondrial hits to the metadata table:
+```{r}
+list.files(paste(sharedPathAn, "LawiiMitodbBlast/", sep = ""))
+for(k in 1:nrow(metadataAssembly)){
+    metadataAssembly$LawiiMitoBlast <- paste(metadataAssembly$LibraryName, "_454AllContigs.blastn", sep = "")
+    metadataAssembly$LawiiMitoBlastPath <- paste(sharedPathAn, "LawiiMitodbBlast/", metadataAssembly$LawiiMitoBlast, sep = "")
+}
+```
+
+Read in a blast output file from the LawiiMitodbBlast qsub
+```{r}
+library(data.table)
+i = 2
+i = 1
+# Until Lari assembly with newbler is done, don't select that row:
+metadataAssemblySubTemp <- metadataAssembly[2:7,]
+
+for(i in 1:nrow(metadataAssemblySubTemp)){
+    blastnTmp <- fread(metadataAssemblySubTemp$LawiiMitoBlastPath[i], sep = "auto", header = FALSE)
+    names(blastnTmp) <- c("qseqid", "sseqid", "pident", "length", "mismatch", 
+                          "gapopen", "qend", "sstart", "send", "evalue", "bitscore")
+    blastnTmp$LibraryName <- metadataAssemblySubTemp$LibraryName[i]
+    blastnTmp$NewblerFnaPath <- metadataAssemblySubTemp$NewblerFnaPath[i]
+    blastnTmp <- blastnTmp[, .(LibraryName, NewblerFnaPath, qseqid, pident, length, mismatch, gapopen, evalue)]
+    if (i == 1){
+        blastnNew <- blastnTmp
+    } else {
+        blastnNew <- rbind(blastnNew, blastnTmp)
+    }
+}
+
+# Retrieve the contigs per genome in the blastnNew data table, edit the name to include the Library Name
+# and then write separate fastq sets per library name...
+
+library(Biostrings)
+i <- 1
+for(i in 1:nrow(metadataAssemblySubTemp)){
+    tempFasta <- readDNAStringSet(metadataAssemblySubTemp$NewblerFnaPath[i], format = "fasta")
+    tempNames <- names(tempFasta)
+    tempNamesTrunc <- sub(" .*", "", tempNames)
+    names(tempFasta) <- tempNamesTrunc
+    setkey(blastnNew, LibraryName)
+    key(blastnNew)
+    blastnNewSub <- blastnNew[.(metadataAssemblySubTemp$LibraryName[i])]
+    blastnNewSub$newContigName <- paste(blastnNewSub$LibraryName, "_", blastnNewSub$qseqid, sep = "")
+    tempFastaSub <- tempFasta[which(names(tempFasta) %in% blastnNewSub$qseqid)]
+    names(tempFastaSub) <- blastnNewSub$newContigName
+    writeXStringSet(tempFastaSub,
+                    file = paste(pathFastq, "/", metadataAssemblySubTemp$LibraryName[i], "_mitoHitsContigs.fasta", sep = ""),
+                    append = FALSE,
+                    format = "fasta")
+
+    }
+
+rm(tempFasta, tempFastaSub, tempNames, tempNamesTrunc)
+
+# Add the name and path of the fasta files of contigs that were mitochondrial hits to the metadata table:
+# Do the following until Lari is done assembling:
+for(k in 1:nrow(metadataAssemblySubTemp)){
+    metadataAssemblySubTemp$mitoContigsFasta <- paste(metadataAssemblySubTemp$LibraryName, "_mitoHitsContigs.fasta", sep = "")
+    metadataAssemblySubTemp$mitoContigsFastaPath <- paste(pathFastq, metadataAssemblySubTemp$mitoContigsFasta, sep = "")
+}
+
+# when Lari assembly with Newbler is complete, instead do:
+# for(k in 1:nrow(metadataAssembly)){
+#     metadataAssembly$mitoContigsFasta <- paste(metadataAssembly$LibraryName, "_mitoHitsContigs.fasta", sep = "")
+#     metadataAssembly$mitoContigsFastaPath <- paste(pathFastq, metadataAssembly$mitoContigsFasta, sep = "")
+# }
+```
+
+Gene prediction software available on the biocluster:
+glimmerHMM: $ ls -l /opt/bio/GlimmerHMM/...
+genemark-es: $ /opt/bio/genemark-es/...
+snap: $ /opt/bio/snap/...
+geneid: $ /opt/bio/geneid/...
+
+FungalITSextractor: $ /opt/bio/FungalITSextractor/...
+
+Running Augustus:
+```{r}
+pathAugustus <- "/home/CFIA-ACIA/girouxeml/prog/augustus-3.2.3/bin/augustus"
+
+prefix <- "Augustus"
+dir.create(paste(sharedPathAn, prefix, sep = ""), showWarnings=TRUE, recursive=FALSE)
+pathAugustusOutput <- paste(sharedPathAn, prefix, "/", sep = "")
+
+# Until Lari assembly with newbler is done, don't select that row:
+metadataAssemblySubTemp <- metadataAssembly[2:7,]
+i <- 1
+for(i in 1:nrow(metadataAssemblySubTemp)){
+    # cmd <- with(metadataAssembly[2:7,],
+    cmd <- with(metadataAssemblySubTemp, 
+                paste("augustus --species=botrytis_cinerea --genemodel=complete ",
+                      "--outfile=", paste(pathAugustusOutput,
+                                          metadataAssemblySubTemp$LibraryName,
+                                          "_augustus_Botrytis_test1_completeGenesOnly.gff", sep = ""),
+                      " ", metadataAssemblySubTemp$NewblerFnaPath,
+                      sep = ""))
+}
+                  
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+
+```
+* Done
+Clean-up step: Remove the output files while keeping the qsub and bash file:
+```{r}
+system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+* Done
+Add the names of the Augustus gff files to the metadata table:
+```{r}
+for(k in 1:nrow(metadataAssembly)){
+    metadataAssembly$Augustus1gff <- paste(metadataAssembly$LibraryName, "_augustus_Botrytis_test1_completeGenesOnly.gff", sep = "")
+    metadataAssembly$Augustus1gffPath <- paste(pathAugustusOutput,metadataAssembly$Augustus1gff, sep = "")
+}
+```
+
+* Done
+Retrieve the predicted protein sequences from the Augustus gff files for each genome:
+```{r}
+# Until Lari assembly with newbler is done, don't select that row:
+metadataAssemblySubTemp <- metadataAssembly[2:7,]
+prefix <- "AugustusQsubAAcds"
+i <- 1
+for(i in 1:nrow(metadataAssemblySubTemp)){
+    # cmd <- with(metadataAssembly[2:7,],
+    cmd <- with(metadataAssemblySubTemp, 
+                paste("getAnnoFasta.pl --protein=on --codingseq=on ", 
+                      metadataAssemblySubTemp$Augustus1gffPath, sep = ""))
+}
+                  
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+
+* Done
+Clean-up step: Remove the output files while keeping the qsub and bash file:
+```{r}
+system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+* Done
+Add the names of the Augustus .aa files to the metadata table:
+```{r}
+for(k in 1:nrow(metadataAssembly)){
+    metadataAssembly$Augustus1aa <- paste(metadataAssembly$LibraryName, "_augustus_Botrytis_test1_completeGenesOnly.aa", sep = "")
+    metadataAssembly$Augustus1aaPath <- paste(pathAugustusOutput,metadataAssembly$Augustus1aa, sep = "")
+}
+```
+
+* Done
+Getting the ITS with the fungalITSextractor script:
+First need the fasta file, not fastq:
+```{r}
+prefix <- "fastq2fasta_finalProcessedFastq"                
+
+i <- 1
+
+for(i in 1:nrow(metadataAssembly)){
+   cmd <- with(metadataAssembly,
+               paste(" seqtk fq2fa ", metadataAssembly$finalProcessedPath, " > ",
+                     paste(pathFastq, metadataAssembly$LibraryName, ".3processed.fasta", sep = ""),
+                     sep = ""))
+}
+
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+
+* Done
+Clean-up step: Remove the output files while keeping the qsub and bash file:
+```{r}
+system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+* Done
+Add the names of the fasta files to the metadata table:
+```{r}
+for(k in 1:nrow(metadataAssembly)){
+    metadataAssembly$finalProcessedFasta <- paste(metadataAssembly$LibraryName, ".3processed.fasta", sep = "")
+    metadataAssembly$finalProcessedFastaPath <- paste(pathFastq, metadataAssembly$finalProcessedFasta, sep = "")
+}
+```
+
+* Done
+2nd: Use fasta in ITSx perl script (remake of FungalITSextractor.pl):
+```{r}
+#fungalITSpath <- "/opt/bio/FungalITSextractor/FungalITSextractor.pl"
+itsxPath      <- "/opt/bio/ITSx/bin/ITSx"
+prefix <- "fungalITSxtractorQsub"
+
+i <- 1
+for(i in 1:nrow(metadataAssembly)){
+    cmd <- with(metadataAssembly,
+                paste(" perl ", itsxPath, " ",
+                      " -i ", metadataAssembly$finalProcessedFastaPath,
+                      " -t F ",               # F here is to specify fungal
+                      " --save_regions all ", # This says I want all outputs, not just ITS 1 and 2
+                      " -o ", paste(pathFastq, "ITSx_", metadataAssembly$LibraryName, sep = ""),
+                      " --table T ",          # This is because I want a tble (True)
+                      " --cpu 6 ",            # To run this in parallel
+                      sep = ""))
+}
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+
+* Not Done
+Clean-up step: Remove the output files while keeping the qsub and bash file:
+```{r}
+system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+* Not done yet
+Gzip the fasta reads that were INPUT to the ITSextractor 
+```{r}
+prefix <- "fungalITSx_gzipFastaQsubs"
+cmd <- with(metadataAssembly, paste("gzip ", metadataAssembly$finalProcessedFastaPath, sep = ""))
+
+suffix <- ".sub"  
+MakeQsubs(cmd, prefix, suffix)
+```
+
+* Not done yet
+Running the GeneMark-ES annotation tool with the "fungi" option.
+Doesn't require a training set.
+```{r}
+# pathGeneMarkES <- "/opt/bio/genemark-es/"
+# CHange above path to local install - still require perl dependencies setup.
 
 
 
+
+````
 
 
 
