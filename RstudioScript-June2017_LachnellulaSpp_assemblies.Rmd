@@ -1723,7 +1723,7 @@ for(k in 1:nrow(metadataAssembly)){
 ```{r}
 #fungalITSpath <- "/opt/bio/FungalITSextractor/FungalITSextractor.pl"
 itsxPath      <- "/opt/bio/ITSx/bin/ITSx"
-prefix <- "fungalITSxtractorQsub"
+prefix <- "fungalITSxtractorQsub_Lari_only"
 
 i <- 1
 for(i in 1:nrow(metadataAssembly)){
@@ -1734,11 +1734,12 @@ for(i in 1:nrow(metadataAssembly)){
                       " --save_regions all ", # This says I want all outputs, not just ITS 1 and 2
                       " -o ", paste(pathFastq, "ITSx_", metadataAssembly$LibraryName, sep = ""),
                       " --table T ",          # This is because I want a tble (True)
-                      " --cpu 6 ",            # To run this in parallel
+                      " --cpu 12 ",            # To run this in parallel
                       sep = ""))
 }
-
-suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+cmd[3]
+#suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd[3], prefix, suffix) # to run Lhya only - since it zombied
 ```
 
 * Not Done
@@ -1763,16 +1764,41 @@ Running the GeneMark-ES annotation tool with the "fungi" option.
 Doesn't require a training set.
 ```{r}
 # pathGeneMarkES <- "/opt/bio/genemark-es/"
-# CHange above path to local install - still require perl dependencies setup.
+# Change above path to local install - still require perl dependencies setup.
 
 
 
 
-````
+```
 
 
+* Not done yet - running interproscan
+```{r}
+interproPath <- "/home/CFIA-ACIA/girouxeml/prog/my_interproscan/interproscan-5.24-63.0/interproscan.sh"
+prefix <- "interProScanQsub"
+interproApps <- "CDD-3.14,Coils-2.2.1,Gene3D-4.1.0,Hamap-201701.18,MobiDBLite-1.0,PANTHER-11.1,Pfam-31.0,PIRSF-3.02,PRINTS-42.0,ProDom-2006.1,ProSitePatterns-20.132,ProSiteProfiles-20.132,SMART-7.1,SUPERFAMILY-1.75,TIGRFAM-15.0"
 
+# Create a directory for interpro outputs:
+dir.create(paste(sharedPathAn, "interproScan_results/", sep = ""), 
+           showWarnings = TRUE, 
+           recursive    = FALSE)
+pathIPScanResults <- paste(sharedPathAn, "interproScan_results/", sep = "")
 
+# Currently using the metadataAssemblySubTemp which omits Lari - bec. Newbler not done running on it.
+i <- 1
+for(i in 1:nrow(metadataAssemblySubTemp)){
+    cmd <- with(metadataAssemblySubTemp,
+                paste(interproPath, " ",
+                      " -i ", metadataAssemblySubTemp$NewblerFnaPath,
+                      " -appl ", interproApps, 
+                      " -d ", pathIPScanResults,
+                      sep = ""))
+}
+cmd[3]
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+
+-appl CDD-3.14,Coils-2.2.1,Gene3D-4.1.0,Hamap-201701.18,MobiDBLite-1.0,PANTHER-11.1,Pfam-31.0,PIRSF-3.02,PRINTS-42.0,ProDom-2006.1,ProSitePatterns-20.132,ProSiteProfiles-20.132,SMART-7.1,SUPERFAMILY-1.75,TIGRFAM-15.0 -i test_proteins.fasta -f tsv
 
 
 
