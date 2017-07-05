@@ -1720,6 +1720,8 @@ for(k in 1:nrow(metadataAssembly)){
 
 * Done
 2nd: Use fasta in ITSx perl script (remake of FungalITSextractor.pl):
+** I put inthe processed fastq files, instead of the newbler assemblies - perhaps it should have 
+been the assemblies...
 ```{r}
 #fungalITSpath <- "/opt/bio/FungalITSextractor/FungalITSextractor.pl"
 itsxPath      <- "/opt/bio/ITSx/bin/ITSx"
@@ -1773,6 +1775,9 @@ Doesn't require a training set.
 
 
 * Not done yet - running interproscan
+Running it on the assembly, not the processed fastq.
+There is a problem with the output directory - it`s not going to what I specified, instead it`s
+putting the output in qsub directory in the temp folder, with the biocluster qsub name as prefix.
 ```{r}
 interproPath <- "/home/CFIA-ACIA/girouxeml/prog/my_interproscan/interproscan-5.24-63.0/interproscan.sh"
 prefix <- "interProScanQsub"
