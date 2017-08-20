@@ -1936,7 +1936,7 @@ cat(cmd[7])
 Perform a blast on the split fasta files.
 ```{r}
 
-prefix <- "Aa_Blastp_splitFastas2"
+prefix <- "Aa_Blastp_splitFastas3"
 
 aaForBlastFiles <- list.files(path = paste(sharedPathAn, "Augustus/", metadataAssembly$LibraryName, "/", sep = ""), 
                               recursive = FALSE, full.names = TRUE)
@@ -2013,7 +2013,15 @@ cmd <- with(metadataAssembly,
                   sep = ""))
 
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
+```
+To remove the output files after you are done:
+```{r}
+system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
 
+Add the name of the output tables from dbCAN to the metadata table:
+```{r}
 metadataAssembly$domtblout <- paste(metadataAssembly$ScientificName, ".CAZy.out.dm", sep = "")
 metadataAssembly$domtbloutPath <- paste(sharedPathAn, metadataAssembly$ScientificName, "/", metadataAssembly$domtblout, sep = "")
 metadataAssembly$dbHmmScanOut <- paste(metadataAssembly$ScientificName, ".out", sep = "")
@@ -2024,31 +2032,24 @@ metadataAssembly$dbScanOutPath <- paste(sharedPathAn, metadataAssembly$Scientifi
 Below is the script I used for extracting CAZy for the Pythium RNA-Seq project
 ####################################################################################################
 
-To remove the output files after you are done:
-```{r}
-system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
-RemoveQsubTempFiles(sharedPathAn, prefix)
-```
 See how many CAZy were pulled out for Pyuu: look for this in the .CAZy.out.dm file
 ```{r}
 library(reshape2)
 library(data.table)
 # test[[i]] <- fread(dbCANList[i], sep = "auto", header = FALSE)
-cazyPyuuAll <- fread(paste(projPath, 
-                        "output/Pythium_ultimum_var_ultimum/Pythium_ultimum_var_ultimum.CAZy.out.dm", 
-                        sep = ""),
-                  sep = "auto", header = TRUE, fill=TRUE)
-cazyPyuuAll <- cazyPyuuAll[-c(1, 2), ]
 
+metadataAssembly$domtbloutPath[7] # This is for Lawi
+cazyLawiAll <- fread(metadataAssembly$domtbloutPath[7], sep = "auto", header = TRUE, fill=TRUE)
+cazyLawiAll <- cazyLawiAll[-c(1, 2), ]
 # rename some columns:
-colnames(cazyPyuuAll)[1] <- "cazyFam"
+colnames(cazyLawiAll)[1] <- "cazyFam"
 # get the unique cazy families:
-cazyFams <- unique(cazyPyuuAll$cazyFam)
+cazyFams <- unique(cazyLawiAll$cazyFam)
 # get the unique genes
-pyuuCazyGenes <- unique(cazyPyuuAll$sequence)
-length(pyuuCazyGenes)
+lawiCazyGenes <- unique(cazyLawiAll$sequence)
+length(lawiCazyGenes)
 # Now make a new table that has only the cazyFam and sequence columns
-cazyFamGene <- subset(cazyPyuuAll, select=c("cazyFam", "sequence"))
+cazyFamGene <- subset(cazyLawiAll, select=c("cazyFam", "sequence"))
 cazyFamGene$cazyFam <- sub(".hmm", "", cazyFamGene$cazyFam)
 # Now collapse rows that have duplicates to one row
 library("dplyr")
@@ -2058,66 +2059,39 @@ length(cazyFams)
 sort1 <- with(cazyFamGene, cazyFamGene[order(-cazyFam, sequence)  , ])
 sort2 <- with(cazyFamGene, cazyFamGene[order(sequence, cazyFam)  , ])
 cazyFamGene <- sort1
-
-#write this to a table:
-library(stargazer)
-stargazer(cazyFamGene, type = "html",
-          title = "Putative CAZy genes of Pythium ultimum var. ultimum",
-          out = paste(figPath, "/tab-PyuuGenes_AllCazy_stargazer.htm", sep = ""),
-          summary = FALSE,
-          header = TRUE,
-          flip = FALSE)
-
-# I'm interested in what a pie graph of the CAZy families in Pyuu would look like?
-summary(cazyFamGene)
-library("plyr")
-cazyFamAll <- unique(as.list(cazyFamGene$cazyFam))
-cazyFamTbl <- count(cazyFamGene, "cazyFam")
-# I want to group the auxiliary activities CAZy families together into one AA group:
-cazyFamGeneTemp <- cazyFamGene
-cazyFamGeneTemp$cazyFam <- gsub('AA.*', "AA", cazyFamGeneTemp$cazyFam)
-# Let's see the frequency table for the cazy families:
-cazyFamTbl <- count(cazyFamGeneTemp, "cazyFam")
-# Let's make a pie graph for this data:
-# First make a count table:
-cazyFamTbleCount <- table(cazyFamGeneTemp$cazyFam)
-# Now create the labels:
-labs <- paste("(",names(cazyFamTbleCount),")","\n", cazyFamTbleCount, sep = "")
-# Get the label percents:
-# how can we do this? 
-# pcr <-
-# now we plot:
-# can we plot this and get labels only for the largets groups? or any ideas?
-png(file = paste(figPath, "/piePyuuCAZyAll.png", sep = ""))
-piePlot <- pie(cazyFamTbleCount, labels = labs, main = "Pie chart of CAZy families in Pyuu")
-print(piePlot)
-dev.off()
 ```
 Run the hmmscan parser on the hmmscan output for each reference species:
 ```{r}
 prefix <- "B_dbCAN_hmmscanParser"
 
-cmd <- with(refMetadata,
-            paste(" sh ", hmmParser,
-                  " ", domtbloutPath, 
-                  " > ", paste(sharedPathAn, Species, "/", Species, ".out.dm.ps", sep = ""),
+cmd <- with(metadataAssembly,
+            paste(" sh " , hmmParser,
+                  " ", domtbloutPath,
+                  " > ", paste(sharedPathAn, ScientificName, "/", ScientificName, ".out.dm.ps", sep = ""),
                   sep = ""))
+
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
-refMetadata$Parseddmtbl <- paste(refMetadata$Species, ".out.dm.ps", sep = "")
-refMetadata$ParsedmtblPath <- paste(sharedPathAn, refMetadata$Species, "/", refMetadata$Parseddmtbl, sep = "")
-write.table(refMetadata, 
-           file = file.path(paste(projPath, "referencesMetadataFinal.csv", sep = "")),
-           append    = FALSE, 
-           sep       = ",",
-           quote     = FALSE,
-           row.names = TRUE,
-           col.names = NA)
 ```
 To remove the output files after you are done:
 ```{r}
 system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
+
+Add the name of the output hmm tables from dbCAN to the metadata table:
+```{r}
+metadataAssembly$Parseddmtbl <- paste(metadataAssembly$ScientificName, ".out.dm.ps", sep = "")
+metadataAssembly$ParsedmtblPath <- paste(sharedPathAn, metadataAssembly$ScientificName, "/", metadataAssembly$Parseddmtbl, sep = "")
+fwrite(metadataAssembly, 
+            file = file.path(paste(sharedPathAn, "referencesMetadataFinal.csv", sep = "")),
+            append    = FALSE, 
+            sep       = ",",
+            quote     = FALSE,
+            row.names = TRUE,
+            col.names = TRUE)
+```
+
+*** Over here!!!
 Would like to generate a table with the captured CAZy proteins, for specific CAZy families:
 ```{r}
 library(reshape2)
