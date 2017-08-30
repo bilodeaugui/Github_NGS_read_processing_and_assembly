@@ -2193,6 +2193,27 @@ write.table(dbCAN_tempFile,
            col.names = NA)
 ```
 
+Need to edit the gff3 output from Augustus:
+Consider the packages:
+http://bioconductor.org/packages/rtracklayer/
+git clone https://git.bioconductor.org/packages/rtracklayer
+```{r}
+# read.delim("/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Augustus/Lari_IonT_2017_1_augustus_Botrytis_test1_completeGenesOnly.gff", header = F, comment.char = "#") -> gff3
+
+
+# Better:
+gff <- gffRead("/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Augustus/Lari_IonT_2017_1_augustus_Botrytis_test1_completeGenesOnly.gff")
+
+library(BiocInstaller)
+biocLite("rtracklayer")
+library(rtracklayer)
+# Don't update source packages
+
+gff <- import.gff("/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Augustus/Lari_IonT_2017_1_augustus_Botrytis_test1_completeGenesOnly.gff")
+
+gff3 <- import.gff3("/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/interProScanQsubTestNoGene3d_all_outputs/Lari_IonT_2017_1_augustus_Botrytis_test1_completeGenesOnly.aa.gff3")
+
+```
 
 
 
