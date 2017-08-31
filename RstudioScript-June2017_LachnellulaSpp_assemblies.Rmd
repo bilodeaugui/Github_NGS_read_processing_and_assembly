@@ -996,6 +996,10 @@ metadataAssemblyLawii <- data.table("ScientificName"=c("Lachnellula_willkommii")
                                                             sep = "")))
 metadataAssembly <- rbind(metadataAssembly, metadataAssemblyLawii)
 
+# This was moved up from dbCAN much later in the script - need to be careful this is the right order
+# according to the table at this point.
+sppAbbr <- c("Lari", "Lcer", "Lhya", "Locc", "Lsub", "Lsue", "Lawi")
+metadataAssembly$SppAbbr <- sppAbbr
 ```
 
 ```{r}
@@ -1642,8 +1646,29 @@ Add the names of the Augustus gff files to the metadata table:
 ```{r}
 for(k in 1:nrow(metadataAssembly)){
     metadataAssembly$Augustus1gff <- paste(metadataAssembly$LibraryName, "_augustus_Botrytis_test1_completeGenesOnly.gff", sep = "")
-    metadataAssembly$Augustus1gffPath <- paste(pathAugustusOutput,metadataAssembly$Augustus1gff, sep = "")
 }
+
+# Note, I made individual directories (manually at the end of the script for easier dir selection 
+# for blast2go) and moved the gff files into them:
+for(j in 1:length(metadataAssembly$LibraryName)){
+  dir.create(paste(pathAugustusOutput, metadataAssembly$LibraryName[j], sep = ""),
+             showWarnings = TRUE, recursive = FALSE)
+}
+
+for(j in 1:length(metadataAssembly$LibraryName)){
+    cmd <- paste("mv ", paste(pathAugustusOutput, metadataAssembly$Augustus1gff, sep = ""),
+                 " ", paste(pathAugustusOutput, metadataAssembly$LibraryName, "/", sep = ""),
+                 sep = "")
+}
+system(cmd)
+
+for(k in 1:nrow(metadataAssembly)){
+    metadataAssembly$Augustus1gffPath <- paste(pathAugustusOutput,
+                                               metadataAssembly$LibraryName, "/", 
+                                               metadataAssembly$Augustus1gff, sep = "")
+}
+
+
 ```
 
 * Done
@@ -1678,7 +1703,20 @@ file.rename(oldnames, paste0(oldnames, ".fa", sep = ""))
 
 for(k in 1:nrow(metadataAssembly)){
     metadataAssembly$Augustus1aa <- paste(metadataAssembly$LibraryName, "_augustus_Botrytis_test1_completeGenesOnly_aa.fa", sep = "")
-    metadataAssembly$Augustus1aaPath <- paste(pathAugustusOutput,metadataAssembly$Augustus1aa, sep = "")
+}
+
+
+for(j in 1:length(metadataAssembly$LibraryName)){
+    cmd <- paste("mv ", paste(pathAugustusOutput, metadataAssembly$Augustus1aa, sep = ""),
+                 " ", paste(pathAugustusOutput, metadataAssembly$LibraryName, "/", sep = ""),
+                 sep = "")
+}
+system(cmd)
+
+for(k in 1:nrow(metadataAssembly)){
+    metadataAssembly$Augustus1aaPath <- paste(pathAugustusOutput,
+                                               metadataAssembly$LibraryName, "/", 
+                                               metadataAssembly$Augustus1aa, sep = "")
 }
 ```
 
@@ -1773,35 +1811,47 @@ There is a problem with the output directory - it`s not going to what I specifie
 putting the output in qsub directory in the temp folder, with the biocluster qsub name as prefix.
 ```{r}
 interproPath <- "/home/CFIA-ACIA/girouxeml/prog/my_interproscan/interproscan-5.24-63.0/interproscan.sh"
-prefix <- "interProScanQsubTest1"
 
-interproApps <- "CDD-3.14,Coils-2.2.1,Gene3D-4.1.0,Hamap-201701.18,MobiDBLite-1.0,PANTHER-11.1,Pfam-31.0,PIRSF-3.02,PRINTS-42.0,ProDom-2006.1,ProSitePatterns-20.132,ProSiteProfiles-20.132,SMART-7.1,SUPERFAMILY-1.75,TIGRFAM-15.0"
-
-prefix2 <- "interProScanQsubTestNoGene3d"
+prefix <- "interProScanQsubTestNoGene3d_all_outputs"
 interproAppsNoGene3d <- "CDD-3.14,Coils-2.2.1,Hamap-201701.18,MobiDBLite-1.0,PANTHER-11.1,Pfam-31.0,PIRSF-3.02,PRINTS-42.0,ProDom-2006.1,ProSitePatterns-20.132,ProSiteProfiles-20.132,SMART-7.1,SUPERFAMILY-1.75,TIGRFAM-15.0"
 
-# Create a directory for interpro outputs:
-dir.create(paste(sharedPathAn, "interproScan_results/", sep = ""), 
-           showWarnings = TRUE, 
-           recursive    = FALSE)
-pathIPScanResults <- paste(sharedPathAn, "interproScan_results/", sep = "")
 
-# Currently using the metadataAssemblySubTemp which omits Lari - bec. Newbler not done running on it.
 i <- 1
 node <- "24"
 for(i in 1:nrow(metadataAssembly)){
     cmd <- with(metadataAssembly,
                 paste(interproPath, " ",
                       " -i ", metadataAssembly$Augustus1aaPath,
-                      #" -appl ", interproApps, 
                       " -appl ", interproAppsNoGene3d, 
                       " --cpu 24 ",
-                      " -f tsv ",
                       sep = ""))
 }
 cmd[3]
-#suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
-suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix2, suffix, node)
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
+```
+
+
+# Create a directory for interpro outputs:
+```{r}
+interProSOutpath <- paste(sharedPathAn, prefix, "/", sep = "")
+
+dir.create(paste(interProSOutpath, "/", 
+                 paste(metadataAssembly$SppAbbr, "_interproscan_results_xml/", sep = ""),
+                 sep = ""), 
+           showWarnings = TRUE, 
+           recursive    = FALSE)
+
+for(k in 1:nrow(metadataAssembly)){
+    metadataAssembly$InterPSoutDirPath <- paste(interProSOutpath,
+                                                metadataAssembly$SppAbbr, "_interproscan_results_xml/",
+                                                sep = "")
+}
+# Move the interproscan results to the new directories
+for(j in 1:length(metadataAssembly$LibraryName)){
+    cmd <- paste("mv ", paste(interProSOutpath, metadataAssembly$LibraryName, "_*", sep = ""), " ", metadataAssembly$InterPSoutDirPath, sep = "")
+}
+
+system(cmd)
 ```
 
 
@@ -1885,8 +1935,6 @@ library(Biostrings)
 # > biocLite("DECIPHER")
 library(DECIPHER)
 
-
-
 ```
 
 
@@ -1939,7 +1987,7 @@ Perform a blast on the split fasta files.
 prefix <- "Aa_Blastp_splitFastas3"
 
 aaForBlastFiles <- list.files(path = paste(sharedPathAn, "Augustus/", metadataAssembly$LibraryName, "/", sep = ""), 
-                              recursive = FALSE, full.names = TRUE)
+                              pattern = "*\\.aa\\.fa$", recursive = FALSE, full.names = TRUE)
 
 node <- 11
 i <- 1
@@ -2097,9 +2145,6 @@ Would like to generate a table with the captured CAZy proteins, for specific CAZ
 library(reshape2)
 library(data.table)
 
-sppAbbr <- c("Lari", "Lcer", "Lhya", "Locc", "Lsub", "Lsue", "Lawi")
-metadataAssembly$SppAbbr <- sppAbbr
-
 dbCANList <- metadataAssembly$ParsedmtblPath
 i <- 1
 test <- lapply(dbCANList, fread, sep = "auto", header = FALSE)
@@ -2200,21 +2245,47 @@ git clone https://git.bioconductor.org/packages/rtracklayer
 ```{r}
 # read.delim("/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Augustus/Lari_IonT_2017_1_augustus_Botrytis_test1_completeGenesOnly.gff", header = F, comment.char = "#") -> gff3
 
+# Andre just did the folllowing:
+gff_file <- read.delim(metadataAssembly$Augustus1gffPath[1], header = FALSE, comment.char = "#", stringsAsFactors = FALSE)
+
+b2gAnnotPath <- paste(sharedPathAn, "Lachnellula_arida/", sep = "")
+
 
 # Better:
-gff <- gffRead("/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Augustus/Lari_IonT_2017_1_augustus_Botrytis_test1_completeGenesOnly.gff")
+#gff <- gffRead("/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Augustus/Lari_IonT_2017_1_augustus_Botrytis_test1_completeGenesOnly.gff")
 
 library(BiocInstaller)
 biocLite("rtracklayer")
 library(rtracklayer)
 # Don't update source packages
 
-gff <- import.gff("/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Augustus/Lari_IonT_2017_1_augustus_Botrytis_test1_completeGenesOnly.gff")
+#gff <- import.gff("/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Augustus/Lari_IonT_2017_1_augustus_Botrytis_test1_completeGenesOnly.gff")
 
-gff3 <- import.gff3("/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/interProScanQsubTestNoGene3d_all_outputs/Lari_IonT_2017_1_augustus_Botrytis_test1_completeGenesOnly.aa.gff3")
+#gff3 <- import.gff3("/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/interProScanQsubTestNoGene3d_all_outputs/Lari_IonT_2017_1_augustus_Botrytis_test1_completeGenesOnly.aa.gff3")
 
 ```
 
+Trying a perl script that merges annotations with gff:
+```{r}
+mergeB2GannotGFF <- "/home/CFIA-ACIA/girouxeml/prog/scripts_pl/merge_blast2goannot_gff.pl"
+
+
+b2gAnnotFiles <- list.files(path = paste(sharedPathAn, metadataAssembly$ScientificName, "/", sep = ""),
+                            pattern = ".*.annot$", recursive = FALSE, full.names = TRUE)
+
+file.rename(b2gAnnotFiles, paste0(gsub(pattern = "_annot_[0-9]+_[0-9]+", replacement = "_b2g_annot", b2gAnnotFiles)))
+
+metadataAssembly$b2gAnnotFile <- paste(metadataAssembly$SppAbbr, "_b2g_annot.annot", sep = "")
+metadataAssembly$b2gAnnotPath <- paste(sharedPathAn, metadataAssembly$ScientificName, "/", metadataAssembly$b2gAnnotFile, sep = "")
+
+# Doesn't work - annotations are not merged.
+cmd <- paste("perl ", mergeB2GannotGFF,
+             " -b ", metadataAssembly$b2gAnnotPath[1],
+             " -g ", metadataAssembly$Augustus1gffPath[1],
+             " > ", paste(sharedPathAn, metadataAssembly$ScientificName[1], "/", metadataAssembly$SppAbbr[1], ".blast2go.gff", sep = ""),
+             sep = "")
+system(cmd)
+```
 
 
 
