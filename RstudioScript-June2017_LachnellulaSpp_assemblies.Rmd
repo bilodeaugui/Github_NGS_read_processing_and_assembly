@@ -1907,11 +1907,9 @@ for(i in 1:nrow(metadataAssembly)){
                       " -evalue ", eval,
                       " -show_gis ",
                       " -num_alignments ", numAligns,
-                      #" -max_hsps_per_subject ", maxHsps,
                       sep = ""))
 }
 cmd[1]
-#suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd[1], prefix, suffix, node)
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```
 
@@ -1958,7 +1956,7 @@ for(i in 1:nrow(metadataAssembly)){
 }
 
 # Enter these manually on command line, otherwise the backslash escape shows "\".
-
+# Paths have been modified, so run the loop above again, and update the output below.
 cat(cmd[1])
 # awk 'BEGIN {n_seq=0;} /^>/ {if(n_seq%1000==0){file=sprintf("/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Augustus/Lari_IonT_2017_1/Lari_IonT_2017_1_%d.aa.fa",n_seq);} print >> file;  n_seq++; next;} { print >> file; }' < /home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Augustus/Lari_IonT_2017_1_augustus_Botrytis_test1_completeGenesOnly_aa.fa
 
@@ -2006,7 +2004,6 @@ for(i in 1:length(aaForBlastFiles)){
 }
 cmd[1]
 
-#suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd[1], prefix, suffix, node)
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```
 
@@ -2194,6 +2191,7 @@ invisible(NULL)
 }
 rmarkdownTable(head(countCAZyFam))
 ```
+
 Need to add a column to the dbCAN data table with the names I want in the phylogeny trees for each species.
 ```{r}
 library(data.table)
