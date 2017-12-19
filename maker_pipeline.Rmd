@@ -1,0 +1,1068 @@
+---
+title: "Maker_Pipeline"
+author: "Emily Giroux"
+date: "12/6/2017"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Getting started in R: Set the working directory > setwd("~/") Check version installed
+```{r global_options, include=FALSE}
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60), tidy = TRUE, fig.align='center')
+```
+
+
+This will help us when finding our files to source functions:
+```{r sourcing_my_functions}
+install.packages("rprojroot")
+library(rprojroot)
+# We specify ours is an RStudio project
+# The root object contains a function that will help us locate our package r files
+# regarless of our current working directory
+root <- rprojroot::is_rstudio_project
+scriptsPath <- root$make_fix_file(".")("R")
+scripts  <- dir(root$find_file("R", path = root$find_file()))
+scriptsl <- paste(scriptsPath, scripts, sep = "//")
+lapply(scriptsl, source)
+```
+
+User: 
+Define the path to the shared folder where the main working directory will be.
+```{r setting_the_main_directory, cache=TRUE}
+sharedPath <- "/home/CFIA-ACIA/girouxeml/PIRL_working_directory/"
+```
+
+Define where the analysis path is, or the path to the current project:
+```{r setting_the_main_directory, cache=TRUE}
+analysis   <- "Lachnellula_species_GenomeAn_IonTorrent_2017/"
+sharedPathAn <- paste(sharedPath, analysis, sep="")
+```
+
+We need to specify where we put the assembly files for our genomes. We had this in our
+metadataAssembly table from our previous script we ran called "RstudioScript-June2017_LachnellulaSpp_assemblies.Rmd"
+We can either read in the table, or take what we have fromt he environment. Reading in the table is better.
+```{r}
+metadataAssemblies <- fread(paste(sharedPathAn, "Lachnellula_genomes_MetadataAssembly.csv", sep = ""),
+                            sep = "auto", header = TRUE)
+metadataAssemblies[, V1:=NULL]
+```
+
+1. De novo Repeat Identification
+The first, and very important, step to genome annotation is identifying repetitive content. Existing libraries 
+from Repbase or from internal efforts are great, but it is also important to identify repeats de novo from your reference 
+genome using RepeatModeler. This is pretty easy to do and normally only takes a couple days using 8-12 cores.
+Why do this? 
+If we were working with a well-studied organism, we wouldn't need to, we could just stick to the database that repeatmasker 
+used which we updated with RepBase. But our species are not well-studied  Lachnellula, and so we need to create 
+a species-specific repeat library for each of our species.
+Make a directory within each species-specific directory that will contain all the Repeat detection and Maker annotation
+data:
+```{r}
+for(k in 1:nrow(metadataAssemblies)){
+    dir.create(paste(sharedPathAn, metadataAssemblies$ScientificName[i], "/", 
+                     paste(metadataAssemblies$SppAbbrv[i], "RepeatDB", sep = "_"),
+                     sep = ""), showWarnings = TRUE, recursive = FALSE)
+}
+```
+
+For each species, build a repeat database for RepeatModeler:
+```{r}
+i <- 1
+
+for(i in 1:nrow(metadataAssemblies)){
+    cmd[i] <- paste("BuildDatabase -name ", metadataAssemblies$SppAbbrv[i], " ",
+                 metadataAssemblies$FixedNewAssemName[i],
+                 sep = "")
+    write(cmd[i], file = paste(metadataAssemblies$RepeatDBPath[i], "buildDB.sh", sep = ""),
+          append = FALSE)
+}
+# cd to each directory and run each buildDB.sh bash script on the command line.
+```
+
+Run RepeatModeler using the databases just made for each species:
+```{r}
+i <- 1 
+
+# how many processors will you use when qloged-in for this bash script?
+pa <- 6
+
+for(i in 1:nrow(metadataAssemblies)){
+    cmd[i] <- paste("RepeatModeler -pa ", pa,
+                    " -database ", metadataAssemblies$SppAbbrv[i],
+                    " 2>&1 | tee repeatmodeler.log ", sep = "")
+    write(cmd[i], file = paste(metadataAssemblies$RepeatDBPath[i], "repeatModeler.sh", sep = ""),
+          append = FALSE)
+}
+# cd to each directory and run each buildDB.sh bash script on the command line.
+```
+
+Remember to use the modified assemblies that have the extra details that Newbler added after 
+the >contig name (3 tabs for contig name, length and some other detail) removed because this 
+info created problems downstream.
+Note, that if there is an unexpected system failure, RepeatModeler can recover from it and 
+continue from where it previously left off. See the README file in its program directory.
+Copy all the consensi.fa.classified libraries to a directory and combine them, then separate 
+fasta entries with known and unknown repeats:
+Setting things up:
+```{r}
+speciesRepeatDBname <- "spp_Lach_repeatDB"
+dir.create(paste(sharedPathAn, "RepeatDatabases", sep = ""), showWarnings = TRUE, recursive = FALSE)
+projRepeatDB <- paste(sharedPathAn, "RepeatDatabases/", sep = "")
+
+dir.create(paste(projRepeatDB, speciesRepeatDBname, sep = ""), showWarnings = TRUE, recursive = FALSE)
+allSppRepeatDBpath <- paste(projRepeatDB, speciesRepeatDBname, "/", sep = "")
+
+for(i in 1:nrow(metadataAssemblies)){
+    tmp[i] <- list.files(path = metadataAssemblies$RepeatDBPath[i], pattern = "^RM_.*")
+    metadataAssemblies$RepeatModelerDir[i] <- tmp[i]
+    metadataAssemblies$RepeatModelerPath[i] <- paste(metadataAssemblies$RepeatDBPath[i], metadataAssemblies$RepeatModelerDir[i], "/", sep = "")
+}
+```
+
+Copying the files:
+```{r}
+prefix <- "copy_Spp_RepModeler"
+cmd <- with(metadataAssemblies, 
+            paste("cp ", paste(metadataAssemblies$RepeatModelerPath, "consensi.fa.classified", sep = ""),
+                  " ", paste(sharedPathAn, "RepeatDatabases/spp_Lach_repeatDB/", 
+                             metadataAssemblies$SppAbbrv, "_consensi.fa.classified", sep = "")))
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+
+Combine them to one file :
+```{r}
+metadataAssemblies$repModelerConsensi <- paste(metadataAssemblies$SppAbbrv, "_consensi.fa.classified", sep = "")
+list <- metadataAssemblies$repModelerConsensi
+output <- paste(list, collapse = " ")
+# I'm automating the output file name, since all the species in this set (Lachnellula spp), are within the same
+# genus, but if this is not the case for another set, specify the output file name manually.
+species <- c(metadataAssemblies$ScientificName)
+genus <- gsub("_.*", "", species)
+genus <- unique(genus)
+repModAllsppFileName <- paste(genus, "consensi.fa.classified", sep = "_")
+cmd <- paste("cat ", output, " > ", genus, "_", "consensi.fa.classified", sep = "")
+
+write(cmd, file = paste(allSppRepeatDBpath, repModAllsppFileName, sep = ""))
+```
+
+split unknown and known repeats to separate files using perl scripts (in ~/prog/scripts_pl/):
+selectFasta_byIDUnknown.pl  selectFasta_byID_Known.pl
+Note - you need to open these perl scripts and edit them to fix the names you want for input and output,
+and you need to run them in the directory where your input is.
+```{r}
+allSppRepeatDBpath <- paste(projRepeatDB, speciesRepeatDBname, "/", sep = "")
+# Write script to parse and get all repeats that are "Known"
+identity <- 1
+infile <- repModAllsppFileName
+parseFastaByHeaderPattern(infile, identity)
+
+# Repeat the above with identity <- 2, to get all the unknown fastas:
+identity <- 2
+infile <- repModAllsppFileName
+parseFastaByHeaderPattern(infile, identity)
+```
+
+QC the output from the unknown_Lachnellula_consensi.fa.classified repeat library to check 
+for repeats that are really genes (gene families) or RNA features:
+
+Blastx vs nr for protein coding genes (I qlogin'd with 22 processors, so thread using 21):
+blastx -db /isilon/biodiversity/reference/ncbi/blastdb/reference/nr/nr -query unknown_lachnellula_consensi.fa.classified -evalue 10e-5 -num_alignments 5 -num_threads 21 > unknown_lachnellula_consensi.fa.classified.nrcheck.blast.out
+To look at the output, search for "Sequences producing significant alignments".
+
+*** Over here!!!
+Blastn vs RNA database for ribosomal or other RNA genes (Rfam.fasta comes with the Rfam download:
+Download the Rfam database: Do this only when it hasn't already been done, or if it's been a really
+long time and you need to update the database:
+$ cd ~/prog/
+$ mkdir rfam
+$ cd rfam
+$ wget -r ftp://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/fasta_files/
+$ mv -f ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/fasta_files/* .
+$ gunzip RF0*
+$ cat *.fa > rfam.fasta
+$ mv RF* ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/fasta_files/
+$ makeblastdb -in rfam.fasta -dbtype nucl
+
+Run Blastn against the rfam database in the Lachnellula_species/RepeatDatabases/spp_Lach_repeatDB dir:
+```{r}
+prefix <- "RepeatDB_blastn"
+cmd <- paste("blastn -db /home/CFIA-ACIA/girouxeml/prog/rfam/rfam.fasta -query ",
+             paste(allSppRepeatDBpath, "Unknown_", infile, sep = ""),
+             " -evalue 10e-5 -num_alignments 5 -num_threads 7 > ",
+             paste(allSppRepeatDBpath, "Unknown_", infile, ".rnacheck.blast.out", sep = ""),
+             sep = "")
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+
+Look at the output from the Blastx and Blastn runs, and remove repeats that are actually really genes (gene families) or RNA features.
+I did not find any hits matching in the Rfam run, so nothing to remove from there. I did find blast hits with the nr check. I removed 
+those repeats with good hits, and documented this in the file
+"Documentation_of_repeats_removed_after_blast_nr_rna_checks_in_unknown_lachnellula_classified_fa.docx". 
+The final unknown file is called "unknown_Lachnellula_consensi.fa.nr.rna.checked.blast.classified" and the known repeat library file
+is called "known_Lachnellula_consensi.fa.classified".
+
+Convert the EMBL repeat library from RepeatMasker to fasta format:
+Place the repeat library in its own dir in the Lachnellula_species dir:
+```{r}
+dir.create(paste(projRepeatDB, "embl_RepeatMaskerDB", sep = ""), showWarnings = TRUE, recursive = FALSE)
+prefix <- "embl_buildRepMaskeLib"
+
+cmd <- paste("perl /home/CFIA-ACIA/girouxeml/prog/RepeatMasker/util/buildRMLibFromEMBL.pl ",
+             "/home/CFIA-ACIA/girouxeml/prog/RepeatMasker/Libraries/RepeatMaskerLib.embl ",
+             paste(allSppRepeatDBpath, "Known_", infile, sep = ""),
+             " ", paste(allSppRepeatDBpath, "Unknown_", infile, sep = ""),
+             sep = "")
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+# RepeatMaskerLib.fasta
+```
+Further steps can be taken to annotate the resulting library, but the most important reason for this 
+library is for downstream gene prediction. This step came from an example where a Boa library was 
+combined with several other snakes and annotated.
+
+
+2. Full Repeat Annotation
+Depending on the species, the de novo library can be fed right into MAKER. We normally do more complex 
+repeat identification with snakes so I will describe that here.
+First, we mask using a currated BovB/CR1 line library to overcome a previously-identified issue with the 
+Repbase annotation. This probably won't be necessary in other species. I used the known library from 
+repeatmasker.lib.EMBL, which I converted to fasta format using RepeatMasker/util/buildRMLibFromEMBL.pl script.
+
+Pass the Lsue assembly through the RepeatMaskerLib.fasta with RepeatMasker:
+```{r}
+# Don't need this!
+# Make a directory in each species dir for the repeats masked with the embl lib:
+# for(i in 1:length(metadataAssemblies$RepeatDBPath)){
+#     dir.create(paste(metadataAssemblies$RepeatDBPath[i], "embl_mask", sep = ""), showWarnings = TRUE, recursive = FALSE)
+# }
+```
+
+Pass the Lsue assembly through the RepeatMaskerLib.fasta with RepeatMasker:
+```{r}
+# how many processors will you use when qloged-in for this bash script?
+pa <- 11
+
+for(i in 1:nrow(metadataAssemblies)){
+    prefix <- "embl_mask"
+    cmd <- paste("RepeatMasker -pa ", pa,
+                 " -lib ", paste(projRepeatDB, "embl_RepeatMaskerDB/RepeatMasterLib.fasta ", sep = ""),
+                 " -dir . ", metadataAssemblies$FixedNewAssemName[i], sep = "")
+    sharedPathAn2 <- paste(metadataAssemblies$RepeatDBPath[i], sep = "")
+    suffix <- ".sub"; cat(bashDirections); MakeQsubs_test(cmd, prefix, suffix, sharedPathAn2)
+}
+
+# Note, the -dir option for RepeatMasker doesn't work, and will output all to the head directory where the 
+# bash scripts are written to. In order to have the output of repeatmasker go to the species-specific directories we want, 
+# we must go to each directory for each species and run the bash scripts from within there, and we must also specify that we want the 
+# output to the current directory " -dir . ".
+```
+
+Then the masked FASTA from this search can be used as input for the next search. I also normally 
+rename the outputs after each round so they are more representative of what they contain. Do 2 rounds, 
+using the known and unknown Lachnellula repeat libraries created, split, so that the known elements 
+would be preferentially annotated over unknown, to the degree possible.
+```{r}
+# Run RepeatMasker with known repeat lib 1st, using as input the embl masked output
+
+# how many processors will you use when qloged-in for this bash script?
+pa <- 11
+
+for(i in 1:nrow(metadataAssemblies)){
+    prefix <- "Known_Mask"
+    cmd <- paste("RepeatMasker -pa ", pa,
+                 " -lib ", paste(allSppRepeatDBpath, "known_Lachnellula_consensi.fa.classified ", sep = ""),
+                 " -dir . ", paste(metadataAssemblies$RepeatDBPath[i], "embl_mask/*.fna.masked", sep = ""), sep = "")
+    sharedPathAn2 <- paste(metadataAssemblies$RepeatDBPath[i], sep = "")
+    suffix <- ".sub"; cat(bashDirections); MakeQsubs_test(cmd, prefix, suffix, sharedPathAn2)
+}
+```
+
+Run RepeatMasker with unknown repeat lib, using as input the unknown masked output. Note, make sure to use the unknown lib
+that was passed through NR, RNA, and BLAST checks to remove repeats that were actually part of genes or functional RNAs.
+```{r}
+# Run RepeatMasker with unknown repeat lib 2nd, using as input the known masked output
+
+# how many processors will you use when qloged-in for this bash script?
+pa <- 11
+
+for(i in 1:nrow(metadataAssemblies)){
+    prefix <- "Unknown_Mask"
+    cmd <- paste("RepeatMasker -pa ", pa,
+                 " -lib ", paste(allSppRepeatDBpath, "unknown_Lachnellula_consensi.fa.nr.rna.checked.blast.classified ", sep = ""),
+                 " -dir . ", paste(metadataAssemblies$RepeatDBPath[i], "Known_Mask/*.fna.masked.masked", sep = ""), sep = "")
+    sharedPathAn2 <- paste(metadataAssemblies$RepeatDBPath[i], sep = "")
+    suffix <- ".sub"; cat(bashDirections); MakeQsubs_test(cmd, prefix, suffix, sharedPathAn2)
+}
+
+# Ignore the segmentation fault errors, these are tries over already masked strings
+```
+
+Finally, results from each round must be analyzed together to produce the final repeat annotation:
+```{r}
+# Make a directory in each species dir for the repeats masked with the embl lib:
+for(i in 1:length(metadataAssemblies$RepeatDBPath)){
+    dir.create(paste(metadataAssemblies$RepeatDBPath[i], "Full_mask", sep = ""), showWarnings = TRUE, recursive = FALSE)
+}
+
+prefix <- "copy_masked_rep_fna"
+cmd <- with(metadataAssemblies,
+            paste("cp ", paste(RepeatDBPath, "Unknown_Mask/*.fna.masked.masked.masked ", sep = ""),
+                  paste(RepeatDBPath, "Full_mask/", SppAbbrv, ".assembly.full_mask.fa", sep = ""),
+                  sep = ""))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+
+prefix2 <- "copy_masked_rep_out"
+cmd2 <- with(metadataAssemblies,
+             paste("cp ", paste(RepeatDBPath, "Unknown_Mask/*.fna.masked.masked.out ", sep = ""),
+                   paste(RepeatDBPath, "Full_mask/", SppAbbrv, ".assembly.full_mask.out", sep = ""),
+                   sep = ""))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
+```
+
+Gunzip and then cat repeat outputs
+```{r}
+prefix <- "gunzipToCatRepeatFasta"
+
+cmd <- with(metadataAssemblies, 
+            paste("gunzip ", 
+                  paste(RepeatDBPath, "embl_mask/*.cat.gz ", sep = ""),
+                  paste(RepeatDBPath, "Known_Mask/*.cat.gz ", sep = ""),
+                  paste(RepeatDBPath, "Unknown_Mask/*.cat.gz ", sep = ""),
+                  sep = ""))
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+
+# Make a directory in each species dir for the final repeats masked:
+```{r}
+for(i in 1:length(metadataAssemblies$RepeatDBPath)){
+    dir.create(paste(metadataAssemblies$RepeatDBPath[i], "Final_mask", sep = ""), showWarnings = TRUE, recursive = FALSE)
+}
+
+prefix <- "catRepeatFasta"
+
+cmd <- with(metadataAssemblies, 
+            paste("cat ", 
+                  paste(RepeatDBPath, "embl_mask/*.cat ", sep = ""),
+                  paste(RepeatDBPath, "Known_Mask/*.cat ", sep = ""),
+                  paste(RepeatDBPath, "Unknown_Mask/*.cat ", sep = ""),
+                  " > ", paste(RepeatDBPath, "Final_mask/", SppAbbrv, ".assembly.full_mask.cat", sep = ""),
+                  sep = ""))
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+
+Process the repeats:
+```{r}
+processRepeatsPath <- "/home/CFIA-ACIA/girouxeml/prog/RepeatMasker/ProcessRepeats"
+
+prefix <- "processRepeats"
+cmd <- with(metadataAssemblies, 
+            paste(processRepeatsPath,
+                  " -species fungi ",
+                  paste(RepeatDBPath, "Final_mask/*.full_mask.cat ", sep = ""),
+                  sep = ""))
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+
+Finally, in order to feed these repeats into MAKER properly, we must separate out the complex repeats (more info on this below).
+create GFF3
+```{r}
+rmOutToGFF3Path <- "/home/CFIA-ACIA/girouxeml/prog/RepeatMasker/util/rmOutToGFF3.pl"
+
+prefix <- "rmOutToGFF3"
+cmd <- with(metadataAssemblies, 
+            paste(rmOutToGFF3Path,
+                  " ", paste(RepeatDBPath, "Full_mask/*.full_mask.out ", sep = ""),
+                  " > ", paste(RepeatDBPath, "Full_mask/", SppAbbrv, ".assembly.full_mask.out.gff3", sep = ""),
+                  sep = ""))
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+
+isolate complex repeats
+```{r}
+prefix <- "isolate_complex_Repeats"
+
+cmd <- with(metadataAssemblies, 
+            paste('grep -v -e "Satellite" -e ")n" -e "-rich"',
+                  " ", paste(RepeatDBPath, "Full_mask/", SppAbbrv, ".assembly.full_mask.out.gff3", sep = ""),
+                  " > ", paste(RepeatDBPath, "Full_mask/", SppAbbrv, ".assembly.full_mask.complex.gff3", sep = ""),
+                  sep = ""))
+            
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+
+reformat to work with MAKER - I can't seem to be able to generate the commands I want for this one.
+The commands are below the chunk - passed them on the terminal in each directory manually.
+```{r}
+cmd <- with(metadataAssemblies,
+            paste("cat ", paste(RepeatDBPath, "Full_mask/", SppAbbrv, ".assembly.full_mask.complex.gff3 ", sep = ""),
+                  " | ",
+                  cat(paste("perl -ane '$id; if(!/^\\#/){@F = split(/\\t/, $_); chomp $F[-1];$id++; $F[-1] .= \"\\;ID=$id\"; $_ = join(\"\\t\", @F).\"\\n\"} print $_' ")),
+                  " > ",
+                  paste(RepeatDBPath, "Full_mask/", SppAbbrv, ".assembly.full_mask.complex.reformat.gff3 ", sep = ""),
+                  sep =""))
+
+# cat Full_mask/Lsue.assembly.full_mask.complex.gff3 | \
+#  perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \
+#  > Full_mask/Lsue.assembly.full_mask.complex.reformat.gff3
+```
+cat Lari.assembly.full_mask.complex.gff3 | \
+perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \
+> Lari.assembly.full_mask.complex.reformat.gff3
+
+cat Lcer.assembly.full_mask.complex.gff3 |\
+perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \
+> Lcer.assembly.full_mask.complex.reformat.gff3
+
+cat Lhya.assembly.full_mask.complex.gff3 |\
+perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \
+> Lhya.assembly.full_mask.complex.reformat.gff3
+
+cat Locc.assembly.full_mask.complex.gff3 |\
+perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \
+> Locc.assembly.full_mask.complex.reformat.gff3
+
+cat Lsub.assembly.full_mask.complex.gff3 |\
+perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \
+> Lsub.assembly.full_mask.complex.reformat.gff3
+
+cat Lawi.assembly.full_mask.complex.gff3 |\
+perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \
+> Lawi.assembly.full_mask.complex.reformat.gff3
+
+
+Now we have the prerequisite data for running MAKER.
+
+3. Initial MAKER Analysis
+MAKER is pretty easy to get going and relies on properly completed control files. These can be 
+generated by issuing the command maker -CTL. The only control file we will be the maker_opts.ctl 
+file. In this first round, we will obviously providing the data files for the repeat annotation 
+(rm_gff), the transcriptome assembly (est), and for the other Squamate protein sequences (protein). 
+We will also set the model_org to 'simple' so that only simple repeats are annotated (along with 
+RepeatRunner). Here is the full control file for reference.
+
+
+testing things
+```{r}
+#replace "genome= " "genome=/home/cfia/fna" -- maker_opts.ctl
+x <- "genome= "
+y <- "genome=/home/cfia.fna"
+
+filenames <- paste(sharedPathAn, "test_edit_maker_CTL_files/maker_opts.ctl", sep = "")
+
+for(f in filenames){
+    x <- readLines(f)
+    y <- gsub("genome= ", "genome=/home/cfia.fna ", x)
+    cat(y, file=f, sep="\n")
+}
+
+# must do changes for genome, and protein in the above command. 
+# "protein= ", "protein=/home/CFIA-ACIA/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/References/Botrytis_cinerea.ASM83294v1.pep.all.fa ",
+
+
+
+# Command below will edit the altest, altest_gff, model_org, augustus_species, est2genome, protein2genome,
+# min_contig:
+
+cmd <- paste("/opt/rocks/bin/replace ",
+             "altest= ", 
+             "altest=/home/CFIA-ACIA/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/References/Botrytis_cinerea.ASM83294v1.cdna.all.fa ",
+             "altest_gff= ", "altest_gff=/home/CFIA-ACIA/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/References/Botrytis_cinerea.ASM83294v1.37.gff3 ",
+             "model_org=all ", "model_org=simple ",
+             "augustus_species= ", "augustus_species=botrytis_cinerea ",
+             "est2genome=0 ", "est2genome=1 ",
+             "protein2genome=0 ", "protein2genome=1 ",
+             "min_contig=1 ", "min_contig=1000 ",
+             " -- ", paste(sharedPathAn, "test_edit_maker_CTL_files/maker_opts.ctl", sep = ""),
+             sep = "")
+
+system(cmd)
+```
+
+
+```{r}
+for(i in 1:length(metadataAssemblies$RepeatDBPath)){
+    dir.create(paste(metadataAssemblies$RepeatDBPath[i], "maker_round_1", sep = ""), showWarnings = TRUE, recursive = FALSE)
+}
+
+metadataAssemblies$maker_rnd1_path <- paste(metadataAssemblies$RepeatDBPath, "maker_round_1/", sep = "")
+makerPath <- "/home/CFIA-ACIA/girouxeml/prog/maker/bin/maker"
+
+# go into each of the "paste(metadataAssemblies$RepeatDBPath, "maker_round_1/", sep = "")", and run the command
+# "maker -CTL"
+
+# cd maker_round_1
+# maker -CTL
+
+# Note - I really don't want to be editing all the contrl files manually...
+metadataAssemblies$FixedNewAssemName
+paste(metadataAssemblies$RepeatDBPath, "Full_mask/", metadataAssemblies$SppAbbrv, ".assembly.full_mask.complex.reformat.gff3 ", sep = "")
+```
+
+Create individual bash scripts in each maker_round_1 directory to qsub the runs:
+```{r}
+# Options for maker_opts.ctl file:
+
+
+# how many processors will you use when qloged-in for this bash script?
+for(i in 1:nrow(metadataAssemblies)){
+    prefix <- "maker_round_1"
+    cmd <- paste("maker maker_exe.ctl maker_bopts.ctl maker_opts.ctl ", sep = "")
+    sharedPathAn2 <- paste(metadataAssemblies$RepeatDBPath[i], sep = "")
+    suffix <- ".sub"; cat(bashDirections); MakeQsubs_test(cmd, prefix, suffix, sharedPathAn2)
+}
+```
+
+
+Edit the maker_opts.ctl file with gedit so it has the following details:
+```{r}
+cat round1_maker_opts.ctl
+```
+
+##-----Genome (these are always required)
+genome=/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Assembly_Files/FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.fna #genome sequence (fasta file or fasta embeded in GFF3 file)
+organism_type=eukaryotic #eukaryotic or prokaryotic. Default is eukaryotic
+
+##-----Re-annotation Using MAKER Derived GFF3
+maker_gff= #MAKER derived GFF3 file
+est_pass=0 #use ESTs in maker_gff: 1 = yes, 0 = no
+altest_pass=0 #use alternate organism ESTs in maker_gff: 1 = yes, 0 = no
+protein_pass=0 #use protein alignments in maker_gff: 1 = yes, 0 = no
+rm_pass=0 #use repeats in maker_gff: 1 = yes, 0 = no
+model_pass=0 #use gene models in maker_gff: 1 = yes, 0 = no
+pred_pass=0 #use ab-initio predictions in maker_gff: 1 = yes, 0 = no
+other_pass=0 #passthrough anyything else in maker_gff: 1 = yes, 0 = no
+
+##-----EST Evidence (for best results provide a file for at least one)
+est= #set of ESTs or assembled mRNA-seq in fasta format
+altest=/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Botrytis_cinerea.ASM83294v1.cdna.all.fa #EST/cDNA sequence file in fasta format from an alternate organism
+est_gff= #aligned ESTs or mRNA-seq from an external GFF3 file
+altest_gff=/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Botrytis_cinerea.ASM83294v1.37.gff3 #aligned ESTs from a closely relate species in GFF3 format
+
+##-----Protein Homology Evidence (for best results provide a file for at least one)
+protein=/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Botrytis_cinerea.ASM83294v1.pep.all.fa  #protein sequence file in fasta format (i.e. from mutiple oransisms)
+protein_gff=  #aligned protein homology evidence from an external GFF3 file
+
+##-----Repeat Masking (leave values blank to skip repeat masking)
+model_org=simple #select a model organism for RepBase masking in RepeatMasker
+rmlib= #provide an organism specific repeat library in fasta format for RepeatMasker
+repeat_protein=/home/CFIA-ACIA/girouxeml/prog/maker/data/te_proteins.fasta #provide a fasta file of transposable element proteins for RepeatRunner
+rm_gff=/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/Full_mask/Lsue.assembly.full_mask.complex.reformat.gff3 #pre-identified repeat elements from an external GFF3 file
+prok_rm=0 #forces MAKER to repeatmask prokaryotes (no reason to change this), 1 = yes, 0 = no
+softmask=1 #use soft-masking rather than hard-masking in BLAST (i.e. seg and dust filtering)
+
+##-----Gene Prediction
+snaphmm= #SNAP HMM file
+gmhmm= #GeneMark HMM file
+augustus_species= botrytis_cinerea #Augustus gene prediction species model
+fgenesh_par_file= #FGENESH parameter file
+pred_gff= #ab-initio predictions from an external GFF3 file
+model_gff= #annotated gene models from an external GFF3 file (annotation pass-through)
+est2genome=1 #infer gene predictions directly from ESTs, 1 = yes, 0 = no
+protein2genome=1 #infer predictions from protein homology, 1 = yes, 0 = no
+trna=0 #find tRNAs with tRNAscan, 1 = yes, 0 = no
+snoscan_rrna= #rRNA file to have Snoscan find snoRNAs
+unmask=0 #also run ab-initio prediction programs on unmasked sequence, 1 = yes, 0 = no
+
+##-----Other Annotation Feature Types (features MAKER doesn't recognize)
+other_gff= #extra features to pass-through to final MAKER generated GFF3 file
+
+##-----External Application Behavior Options
+alt_peptide=C #amino acid used to replace non-standard amino acids in BLAST databases
+cpus=12 #max number of cpus to use in BLAST and RepeatMasker (not for MPI, leave 1 when using MPI)
+
+##-----MAKER Behavior Options
+max_dna_len=100000 #length for dividing up contigs into chunks (increases/decreases memory usage)
+min_contig=1000 #skip genome contigs below this length (under 10kb are often useless)
+
+pred_flank=200 #flank for extending evidence clusters sent to gene predictors
+pred_stats=0 #report AED and QI statistics for all predictions as well as models
+AED_threshold=1 #Maximum Annotation Edit Distance allowed (bound by 0 and 1)
+min_protein=0 #require at least this many amino acids in predicted proteins
+alt_splice=0 #Take extra steps to try and find alternative splicing, 1 = yes, 0 = no
+always_complete=0 #extra steps to force start and stop codons, 1 = yes, 0 = no
+map_forward=0 #map names and attributes forward from old GFF3 genes, 1 = yes, 0 = no
+keep_preds=0 #Concordance threshold to add unsupported gene prediction (bound by 0 and 1)
+
+split_hit=10000 #length for the splitting of hits (expected max intron size for evidence alignments)
+single_exon=0 #consider single exon EST evidence when generating annotations, 1 = yes, 0 = no
+single_length=250 #min length required for single exon ESTs if 'single_exon is enabled'
+correct_est_fusion=0 #limits use of ESTs in annotation to avoid fusion genes
+
+tries=2 #number of times to try a contig if there is a failure for some reason
+clean_try=0 #remove all data from previous run before retrying, 1 = yes, 0 = no
+clean_up=0 #removes theVoid directory with individual analysis files, 1 = yes, 0 = no
+TMP= #specify a directory other than the system default temporary directory for temporary files
+
+Specifying the GFF3 annotation file for the annotated complex repeats (rm_gff) has the 
+effect of hard masking these repeats so that they do not confound our ability to identify 
+coding genes. We let MAKER identify simple repeats internally, since it will soft mask these, 
+allowing them to be available for gene annotation. This isn't a typical approach but has to be done 
+if you want to do more than one succeessive round of RepeatMasker. I verified this would work with 
+the MAKER maintainers here. Two other important settings are est2genome and protein2genome, which 
+are set to 1 so that MAKER gene predictions are based on the aligned transcripts and proteins (the 
+only form of evidence we currently have). I also construct the MAKER command in a Bash script so 
+it is easy to run and keep track of.
+```{r}
+maker maker_opts.ctl maker_bopts.ctl maker_exe.ctl
+```
+
+Note  I should try to set-up a qsub bash script, but haven't yet for this. The example I have is:
+In a bash script called "round1_run_maker.sh"
+Have the following:
+mpiexec -n 12 maker -base Bcon_rnd1 round1_maker_opts.ctl maker_bopts.ctl maker_exe.ctl
+Then we run MAKER.
+bash ./round1_run_maker.sh 2>&1 | tee round1_run_maker.log
+Given MAKER will be using BLAST to align transcripts and proteins to the genome, this will take at 
+least a couple days with 12 cores. Speed is a product of the resources you allow (more cores == faster) 
+and the assembly quality (smaller, less contiguous scaffolds == longer). We conclude by assembling 
+together the GFF and FASTA outputs.
+```{r}
+cd FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.maker.output/
+
+gff3_merge -s -d FromB2GSupport_Lsue_assembly_EG_2017_mod_removessThan200_contig00022trim_master_datastore_index.log  > Lsue_rnd1.all.maker.gff3
+
+fasta_merge -d FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLesn200_contig00022trim_master_datastore_index.log
+
+# GFF w/o the sequences
+gff3_merge -n -s -d FromB2GSupport_Lsue_assembly_EG_2017_mod_removessThan200_contig00022trim_master_datastore_index.log > Lsue_rnd1.all.maker.noseq.gff3
+```
+
+4. Training Gene Prediction Software
+Besides mapping the empirical transcript and protein evidence to the reference genome and repeat 
+annotation (not much of this in our example, given we've done so much up front), the most important 
+product of this MAKER run is the gene models. These are what is used for training gene prediction 
+software like augustus and snap.
+SNAP
+SNAP is pretty quick and easy to train. Issuing the following commands will perform the training. It 
+is best to put some thought into what kind of gene models you use from MAKER. Ideally we would 
+like to have sufficient evidence to filter to use models with an AED of 0.25 or better and a length 
+of 50 or more amino acids (maker2zff -x 0.25 -l 50), which helps get rid of junky models, but we do not 
+have enough evidence to support this for our data (no EST or transcript data for our specific organism), 
+and it will result in nothing being returned. Instead, set the options to â€œ-nâ€ (no filters). 
+Go back up to this directory of Lsue, the maker_round_1 dir:
+```{r}
+cd ~/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/
+
+mkdir snap
+
+mkdir snap/round1
+
+cd snap/round1
+```
+
+export 'confident' gene models from MAKER and rename to something meaningful
+
+For determining which genes are High Confidence for Retraining:
+```{r}
+maker2zff -n ../../FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.maker.output/FromB2GSupport_Ls_2017_mod_removedlLessThan200_contig00022trim_master_datastore_index.log
+```
+
+Take a quick look at number of seqs in genome.dna file
+```{r}
+grep ">" genome.dna | wc l
+
+~/perl5/bin/rename 's/genome/Lsue_rnd1.zff/g' *
+```
+
+gather some stats and validate
+```{r}
+fathom Lsue_rnd1.zff.ann Lsue_rnd1.zff.dna -gene-stats > gene-stats.log 2>&1
+
+fathom Lsue_rnd1.zff.ann Lsue_rnd1.zff.dna -validate > validate.log 2>&1
+```
+
+collect the training sequences and annotations, plus 1000 surrounding bp for training
+```{r}
+fathom Lsue_rnd1.zff.ann Lsue_rnd1.zff.dna -categorize 1000 > categorize.log 2>&1
+
+fathom uni.ann uni.dna -export 1000 -plus > uni-plus.log 2>&1
+```
+
+Note that files with data were created, but the export log is empty  still continuing.
+
+Create the training parameters
+```{r}
+mkdir params
+
+cd params
+
+forge ../export.ann ../export.dna > ../forge.log 2>&1
+
+cd ..
+```
+
+Assemble the HMM
+```{r}
+hmm-assembler.pl Lsue_rnd1.zff params > Lsue_rnd1.zff.hmm
+```
+
+Augustus
+Training Augustus is a more laborious process. Luckily, the recent release of BUSCO provides 
+a nice pipeline for performing the training, while giving you an idea of how good your annotation 
+already is (If you don't want to go this route, there are scripts provided with Augustus to 
+perform the training). First, the Parallel::ForkManager module for Perl is required to run BUSCO 
+with more than one core. You can easily install it before the first time you use BUSCO by running 
+sudo apt-get install libparallel-forkmanager-perl.
+cpanm Parallel::ForkManager
+
+This probably isn't an ideal training environment, but appears to work well. First, we must put 
+together training sequences using the gene models we created in our first run
+of MAKER. We do this by issuing the following command to excise the regions that contain mRNA 
+annotations based on our initial MAKER run (with 1000bp on each side).
+
+```{r}
+awk -v OFS="\t" '{ if ($3 == "mRNA") print $1, $4, $5 }' ../../FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022_trim.maker.output/Lsue_rnd1.all.maker.noseq.gff3 | \
+  awk -v OFS="\t" '{ if ($2 < 1000) print $1, "0", $3+1000; else print $1, $2-1000, $3+1000 } ' | \
+  bedtools getfasta -fi ~/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Assembly_Files/FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.fna -bed - -fo Lsue_rnd1.all.maker.transcripts1000.fasta
+```
+
+There are some important things to note based on this approach. First is that you will likely 
+get warnings from BEDtools that certain coordinates could not be used to extract FASTA sequences. 
+This is because the end coordinate of a transcript plus 1000 bp is beyond the total length of a 
+given scaffold. This script does account for transcripts being within the beginning 1000bp of the 
+scaffold, but there was no easy way to do the same with transcripts within the last 1000bp of the 
+scaffold. This is okay, however, as we still end up with sequences from thousands of gene models and 
+BUSCO will only be searching for a small subset of genes itself.
+While we've only provided sequences from regions likely to contain genes, we've totally eliminated 
+any existing annotation data about the starts/stops of gene elements. Augustus would normally use 
+this as part of the training process. However, BUSCO will essentially do a reannotation of these 
+regions using BLAST and built-in HMMs for a set of conserved genes (hundreds to thousands). This has 
+the effect of recreating some version of our gene models for these conserved genes. We then leverage 
+the internal training that BUSCO can perform (the --long argument) to optimize the HMM search model to 
+train Augustus and produce a trained HMM for MAKER. Here is the command we use to perform the Augustus 
+training inside BUSCO.
+```{r}
+python ~/prog/busco/scripts/run_BUSCO.py -i Lsue_rnd1.all.maker.transcripts1000.fasta -o Lsue_rnd1_maker -l ~/prog/busco_datasets/pezizomycotina_odb9/ -m genome -c 8 --long -z -sp botrytis_cinerea --augustus_parameters='--progress=true'
+
+# Note, if the run fails:
+# Segmentation fault (core dumped)
+# Restart the run with the following, it will continue from where it left off. However, check the 
+# config.ini file in ~/prog/busco/config/ to make sure that restart is set to True, and that you adjust 
+# the number of cpu to use according to the qlogin session you have:
+
+python ~/prog/busco/scripts/run_BUSCO.py --in Lsue_rnd1.all.maker.transcripts1000.fasta --out Lsue_rnd1_maker --lineage_path ~/prog/busco_datasets/pezizomycotina_odb9/ --method genome --cpu 21 --long --tarzip --species botrytis_cinerea --augustus_parameters='--progress=true' --restart
+```
+
+In this case, we are using the Pezizomycotina set of conserved genes (N = 3156 genes), so BUSCO 
+will try to identify those genes using BLAST and an initial HMM model for each that comes stocked 
+within the BUSCO database. We specify the -m genome option since we are giving BUSCO regions that 
+include more than just transcripts. The initial HMM model we'll use is the Botrytis cinerea one 
+(-sp botrytis_cinerea), which is a reasonably close species (the closest we'll get). Finally, the --long 
+option tells BUSCO to use the initial gene models it creates to optimize the HMM settings of the raw 
+human HMM, thus training it for our use on Lsue. We can have this run in parallel on several cores, 
+but it will still likely take days, so be patient.
+Once BUSCO is complete, it will give you an idea of how complete your annotation is (though be cautious, 
+because we haven't filtered away known alternative transcripts that will be binned as duplicates). We need 
+to do some post-processing of the HMM models to get them ready for MAKER. First, we'll rename the files within
+/Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/snap/round1/run_Lsue_rnd1_maker/augustus_output/retraining_parameters.
+```{r}
+~/perl5/bin/rename 's/BUSCO_Lsue_rnd1_maker_2899346189/Lsue/g' *
+```
+
+We also need to rename the files cited within certain HMM configuration files.
+```{r}
+sed -i 's/BUSCO_Lsue_rnd1_maker_2899346189/Lsue/g' Lsue_parameters.cfg
+```
+
+Finally, we must copy these into the $AUGUSTUS_CONFIG_PATH species HMM location so they are accessible 
+by Augustus and MAKER. I had put the $AUGUSTUS_CONFIG_PATH in the .bash_profile, after copying the 
+directory from the isilon maker pipeline, for maker version 2.10. This is because I do not have 
+write access to the isilon directory, but I do have it for my local directory.
+
+Do this from within the dir /Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/snap/round1/run_Lsue_rnd1_maker/augustus_output/retraining_parameters/
+```{r}
+mkdir $AUGUSTUS_CONFIG_PATH/species/Lsue
+
+cp Lsue*  $AUGUSTUS_CONFIG_PATH/species/Lsue/
+```
+
+5. MAKER With Ab Initio Gene Predictors
+Now let's run a second round of MAKER, but this time we will have Genemark-es, SNAP and Augustus run 
+within MAKER to help create more sound gene models. MAKER will use the annotations from these two 
+prediction programs when constructing its models. Before running, let's first recycle the mapping of 
+empicial evidence we have from the first MAKER round, so we don't have to perform all the BLASTs, etc. again.
+Perform the following in the dir: 
+/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.maker.output/
+
+Transcript alignments - our file will be empty, as we have no est or transcript evidence, so may need to fix this:
+```{r}
+awk '{ if ($2 == "est2genome") print $0 }' Lsue_rnd1.all.maker.noseq.gff3 > Lsue_rnd1.all.maker.est2genome.gff3
+```
+
+Protein alignments
+```{r}
+awk '{ if ($2 == "protein2genome") print $0 }' Lsue_rnd1.all.maker.noseq.gff3 > Lsue_rnd1.all.maker.protein2genome.gff3
+```
+
+Repeat alignments
+```{r}
+awk '{ if ($2 ~ "repeat") print $0 }' Lsue_rnd1.all.maker.noseq.gff3 > Lsue_rnd1.all.maker.repeats.gff3
+```
+
+I've also included a round of modelling using genemark-es, which is supposed to be especially useful 
+for fungal genomes. It's a bit tricky to install the genemark-es due to dependencies, but works by 
+installing one at a time all dependencies using cpanm. Also, there was an error when trying to run it at first:
+/usr/bin/perl: symbol lookup error: /home/CFIA-ACIA/girouxeml/perl5/lib/perl5/x86_64-linux-thread-multi/auto/List/Util/Util.so: undefined symbol: Perl_xs_apiversion_bootcheck
+The fix was to remove the dir in:
+```{r}
+~/perl5/lib/perl5/x86_64-linux-thread-multi/auto/List/Util/
+# in the dir:
+cd ~/perl5/lib/perl5/
+
+mv -f x86_64-linux-thread-multi ~
+
+# I moved it to the home directory just in case I needed it again if things failed, but it can be deleted completely.
+# See: https://www.reddit.com/r/openbsd/comments/65efvo/openbsd_61_perl_problem_undefined_symbol_perl_xs/ 
+```
+
+Run Genemark-es:
+in the dir:
+/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/
+```{r}
+mkdir genemark-es_round1
+
+perl ~/prog/genemark-es/gmes_petap.pl --ES --fungus --cores 11 --v --sequence ~/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Assembly_Files/FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.fna
+```
+
+Rename the output file to include the organism name:
+```{r}
+mv output/gmhmm.mod output/Lsue_GMES.mod
+```
+
+Now go up to the Lsue_RepeatDB dir, and create a dir for the next round of maker:
+In the dir: /Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/
+```{r}
+mkdir maker_round_2b
+
+cp maker_round_1/maker_* maker_round_2b/
+```
+
+Then we will modify the previous control file, removing the FASTA sequences files to map and 
+replacing them with the GFFs (est_gff, protein_gff, and rm_gff, respectively. We can also 
+specify the path to the Genemark-es .mod, SNAP HMM and the species name for Augustus, so that 
+these gene prediction programs are run. We will also switch est2genome and protein2genome to 0 
+so that gene predictions are based on the Augustus and SNAP gene models. Here is the full version 
+of this control file. Unfortunately we do not have est or transcript evidence to use, so instead I 
+used the gff3 of the botrytis cinerea model, which may be a mistake. I set est2genome=0. I also 
+installed the trnascan program locally, following the instructions on: 
+https://iamphioxus.org/2016/01/20/installing-trnascan-se-and-snoscan/ and added the 
+following to my .bash_profile:
+```{r}
+export Path="/home/CFIA-ACIA/girouxeml/prog/tRNAscan-SE/bin:$PATH"
+PERL5LIB=~prog/tRNAscan-SE/bin
+```
+
+I also modified the maker_exe.ctl with the local path to tRNAscan.
+```{r}
+cat round2_maker_opts.ctl
+```
+#-----Genome (these are always required)
+genome=/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Assembly_Files/FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.fna #genome sequence (fasta file or fasta embeded in GFF3 file)
+organism_type=eukaryotic #eukaryotic or prokaryotic. Default is eukaryotic
+
+#-----Re-annotation Using MAKER Derived GFF3
+maker_gff= #MAKER derived GFF3 file
+est_pass=0 #use ESTs in maker_gff: 1 = yes, 0 = no
+altest_pass=0 #use alternate organism ESTs in maker_gff: 1 = yes, 0 = no
+protein_pass=0 #use protein alignments in maker_gff: 1 = yes, 0 = no
+rm_pass=0 #use repeats in maker_gff: 1 = yes, 0 = no
+model_pass=0 #use gene models in maker_gff: 1 = yes, 0 = no
+pred_pass=0 #use ab-initio predictions in maker_gff: 1 = yes, 0 = no
+other_pass=0 #passthrough anyything else in maker_gff: 1 = yes, 0 = no
+
+#-----EST Evidence (for best results provide a file for at least one)
+est= #set of ESTs or assembled mRNA-seq in fasta format
+altest= #EST/cDNA sequence file in fasta format from an alternate organism
+est_gff= #aligned ESTs or mRNA-seq from an external GFF3 file
+altest_gff=/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Botrytis_cinerea.ASM83294v1.37.gff3 #aligned ESTs from a closly relate species in GFF3 format
+
+#-----Protein Homology Evidence (for best results provide a file for at least one)
+protein= #protein sequence file in fasta format (i.e. from mutiple oransisms)
+protein_gff=/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.maker.output/Lsue_rnd1.all.maker.protein2genome.gff3  #aligned protein homology evidence from an external GFF3 file
+
+#-----Repeat Masking (leave values blank to skip repeat masking)
+model_org= #select a model organism for RepBase masking in RepeatMasker
+rmlib= #provide an organism specific repeat library in fasta format for RepeatMasker
+repeat_protein= #provide a fasta file of transposable element proteins for RepeatRunner
+rm_gff=/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.maker.output/Lsue_rnd1.all.maker.repeats.gff3 #pre-identified repeat elements from an external GFF3 file
+prok_rm=0 #forces MAKER to repeatmask prokaryotes (no reason to change this), 1 = yes, 0 = no
+softmask=1 #use soft-masking rather than hard-masking in BLAST (i.e. seg and dust filtering)
+
+#-----Gene Prediction
+snaphmm=/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/snap/round1/Lsue_rnd1.zff.hmm #SNAP HMM file
+gmhmm=/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/genemark-es_round_1/output/Lsue_GMES.mod #GeneMark HMM file
+augustus_species=Lachnellula_suecica #Augustus gene prediction species model
+fgenesh_par_file= #FGENESH parameter file
+pred_gff= #ab-initio predictions from an external GFF3 file
+model_gff= #annotated gene models from an external GFF3 file (annotation pass-through)
+est2genome=0 #infer gene predictions directly from ESTs, 1 = yes, 0 = no
+protein2genome=0 #infer predictions from protein homology, 1 = yes, 0 = no
+trna=1 #find tRNAs with tRNAscan, 1 = yes, 0 = no
+snoscan_rrna= #rRNA file to have Snoscan find snoRNAs
+unmask=0 #also run ab-initio prediction programs on unmasked sequence, 1 = yes, 0 = no
+
+#-----Other Annotation Feature Types (features MAKER doesn't recognize)
+other_gff= #extra features to pass-through to final MAKER generated GFF3 file
+
+#-----External Application Behavior Options
+alt_peptide=C #amino acid used to replace non-standard amino acids in BLAST databases
+cpus=21 #max number of cpus to use in BLAST and RepeatMasker (not for MPI, leave 1 when using MPI)
+
+#-----MAKER Behavior Options
+max_dna_len=300000 #length for dividing up contigs into chunks (increases/decreases memory usage)
+min_contig=1 #skip genome contigs below this length (under 10kb are often useless)
+
+pred_flank=200 #flank for extending evidence clusters sent to gene predictors
+pred_stats=0 #report AED and QI statistics for all predictions as well as models
+AED_threshold=1 #Maximum Annotation Edit Distance allowed (bound by 0 and 1)
+min_protein=0 #require at least this many amino acids in predicted proteins
+alt_splice=0 #Take extra steps to try and find alternative splicing, 1 = yes, 0 = no
+always_complete=0 #extra steps to force start and stop codons, 1 = yes, 0 = no
+map_forward=0 #map names and attributes forward from old GFF3 genes, 1 = yes, 0 = no
+keep_preds=0 #Concordance threshold to add unsupported gene prediction (bound by 0 and 1)
+
+split_hit=20000 #length for the splitting of hits (expected max intron size for evidence alignments)
+single_exon=0 #consider single exon EST evidence when generating annotations, 1 = yes, 0 = no
+single_length=250 #min length required for single exon ESTs if 'single_exon is enabled'
+correct_est_fusion=0 #limits use of ESTs in annotation to avoid fusion genes
+
+tries=2 #number of times to try a contig if there is a failure for some reason
+clean_try=0 #remove all data from previous run before retrying, 1 = yes, 0 = no
+clean_up=0 #removes theVoid directory with individual analysis files, 1 = yes, 0 = no
+TMP= #specify a directory other than the system default temporary directory for temporary files
+
+
+
+Then we can run MAKER, substituting this new control file, and summarize the output, as we did before.
+Once the run is complete:
+```{r}
+cd FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.maker.output/
+
+gff3_merge -s -d FromB2GSupport_Lsue_assembly_EG_2017_mod_removedLessThan200_contig00022trim_master_datastore_index.log  > Lsue_rnd2b.all.maker.gff3
+
+fasta_merge -d FromB2GSupport_Lsue_assembly_EG_2017_mod_removedLessThan200_contig00022trim_master_datastore_index.log
+
+# GFF w/o the sequences
+gff3_merge -n -s -d FromB2GSupport_Lsue_assembly_EG_2017_mod_removedLessThan200_contig00022trim_master_datastore_index.log > Lsue_rnd2b.all.maker.noseq.gff3
+```
+
+Go back up to this directory of Lsue, the maker_round_2 dir:
+```{r}
+cd /home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/maker_round_2b/
+
+mkdir snap
+
+mkdir round2
+
+cd snap/round2/
+
+maker2zff -n ../../FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.maker.output/FromB2GSupport_Lsue_assembly_EG_2017_mod_removedLessThan200_contig00022trim_master_datastore_index.log
+
+grep ">" genome.dna | wc -l
+
+~/perl5/bin/rename 's/genome/Lsue_rnd2.zff/g' *
+
+fathom Lsue_rnd2.zff.ann Lsue_rnd2.zff.dna -gene-stats > gene-stats.log 2>&1
+
+fathom Lsue_rnd2.zff.ann Lsue_rnd2.zff.dna -validate > validate.log 2>&1
+
+fathom Lsue_rnd2.zff.ann Lsue_rnd2.zff.dna -categorize 1000 > categorize.log 2>&1
+
+fathom uni.ann uni.dna -export 1000 -plus > uni-plus.log 2>&1
+
+mkdir params
+
+cd params
+
+forge ../export.ann ../export.dna > ../forge.log 2>&1
+
+cd ..
+
+hmm-assembler.pl Lsue_rnd2.zff params > Lsue_rnd2.zff.hmm
+
+cd ../../maker_round_2b/
+
+cat FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.maker.output/Lsue_rnd2b.all.maker.gff3 | awk '{ if ($3 == "gene") print $0 }' | awk '{ sum += ($5 - $4) } END { print NR, sum / NR }'
+# for round1: 8067 1849.07
+# for round2: 7084 1652.54
+
+perl ~/prog/scripts_pl/AED_cdf_generator.pl -b 0.025 FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022_mod_removedlLessThan200_contig00022trid_rim.maker.output/Lsue_rnd2b.all.maker.gff3
+# for round1: 0.500 = 0.988
+# for round2: 0.500 = 0.991
+
+cd snap/round2/
+
+awk -v OFS="\t" '{ if ($3 == "mRNA") print $1, $4, $5 }' ../../FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022_trim.maker.output/Lsue_rnd2.all.maker.noseq.gff3 | \
+  awk -v OFS="\t" '{ if ($2 < 1000) print $1, "0", $3+1000; else print $1, $2-1000, $3+1000 } ' | \
+  bedtools getfasta -fi ~/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Assembly_Files/FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.fna -bed - -fo Lsue_rnd2.all.maker.transcripts1000.fasta
+
+grep ">" Lsue_rnd2.all.maker.transcripts1000.fasta | wc -l
+5782
+
+python ~/prog/busco/scripts/run_BUSCO.py --in Lsue_rnd2.all.maker.transcripts1000.fasta --out Lsue_rnd2_maker --lineage_path ~/prog/busco_datasets/pezizomycotina_odb9/ --mode genome --cpu 7 --long --tarzip --restart --species Lsue --augustus_parameters='--progress=true'
+
+cd run_Lsue_rnd2_maker/augustus_output/retraining_paramters/
+~/perl5/bin/rename 's/BUSCO_Bcon_rnd2_maker_2277442865/Boa_constrictor/g' *
+```
+
+6. Iteratively Running MAKER to Improve Annotation
+One of the beauties of MAKER is that it can be run iteratively, using the gene models 
+from the one round to train ab initio software to improve the inference of gene models 
+in the next round. Essentially, all one has to do is repeat steps 4 and 5 to perform another 
+round of annotation. The MAKER creators/maintainers recommend at least a couple rounds of 
+ab initio software training and MAKER annotation (i.e., 3 rounds total) and returns start to 
+diminish (at differing rates) thereafter. One needs to be careful not to overtrain Augustus and SNAP, 
+so more rounds isn't necessarily always better. Below are a few ways of evaluating your gene models 
+after successive rounds of MAKER to identify when you have sound models.
+
+A. Count the number of gene models and the gene lengths after each round.
+cat <roundN.full.gff> | awk '{ if ($3 == "gene") print $0 }' | awk '{ sum += ($5 - $4) } END { print NR, sum / NR }'
+For example:
+```{r}
+cat FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.maker.output/Lsue_rnd2b.all.maker.gff3 | awk '{ if ($3 == "gene") print $0 }' | awk '{ sum += ($5 - $4) } END { print NR, sum / NR }'
+```
+
+B. Visualize the AED distribution. AED ranges from 0 to 1 and quantifies the confidence 
+in a gene model based on empirical evidence. Basically, the lower the AED, the better a 
+gene model is likely to be. Ideally, 95% or more of the gene models will have an AED of 0.5 or 
+better in the case of good assemblies. You can use this AED_cdf_generator.pl script to help with this.
+perl AED_cdf_generator.pl -b 0.025 <roundN.full.gff>
+i.e., 
+```{r}
+perl ~/prog/scripts_pl/AED_cdf_generator.pl -b 0.025 FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022_mod_removedlLessThan200_contig00022trid_rim.maker.output/Lsue_rnd2b.all.maker.gff3
+```
+
+C. Run BUSCO one last time using the species Augustus HMM and take a look at the results 
+(this will be quick since we are not training Augustus). Also, only include the transcript 
+sequences (not the 1000 bp on each side) and be sure to take the best (i.e., longest) transcript 
+for each gene so you aren't artificially seeding duplicates. You can also run it on the best protein 
+sequence per gene instead. Your command will be some derivative of the following:
+BUSCO.py -i <roundN.transcripts.fasta>  -o annotation_eval -l tetrapoda_odb9/ \
+  -m transcriptome -c 8 -sp Boa_constrictor -z --augustus_parameters='--progress=true'
+
+D. Visualize the gene models from Augustus, SNAP, and MAKER using a genome browser. 
+JBrowse is a good option for this. You can essentially follow this guide to get this started. 
+A helpful resource is this gff2jbrowse.pl script, which automates adding tracks to the browser 
+based on the GFF output of your MAKER run. It is best to use 5-10 longer, gene dense scaffolds 
+and visually inspect them. When SNAP and Augustus are well trained, their models should overlap 
+pretty closely with the final MAKER models. Moreover, there will be spurious hits from SNAP and 
+Augustus, but they are usually short, 1-2 exon annotations and don't have empirical support. 
+You'll get a sense of a good annotation with some experience. Also, it is possible SNAP won't 
+produce good results, depending on your organism, which the MAKER folks have pointed out in the 
+past (Augustus usually does pretty well).
+
+
+
+
+
+
