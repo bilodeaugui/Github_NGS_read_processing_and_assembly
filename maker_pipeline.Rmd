@@ -400,7 +400,7 @@ cmd <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
-reformat to work with MAKER - I can't seem to be able to generate the commands I want for this one.
+Reformat to work with MAKER - I can't seem to be able to generate the commands I want for this one.
 The commands are below the chunk - passed them on the terminal in each directory manually.
 ```{r}
 cmd <- with(metadataAssemblies,
@@ -440,7 +440,12 @@ perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "
 > Lawi.assembly.full_mask.complex.reformat.gff3
 
 
-Now we have the prerequisite data for running MAKER.
+Now we have the prerequisite data for running MAKER. Add this to the data table:
+```{r}
+metadataAssemblies$makerFullMaskGFF3 <- paste(metadataAssemblies$RepeatDBPath, "Full_mask/",
+                                              metadataAssemblies$SppAbbrv, ".assembly.full_mask.complex.reformat.gff3",
+                                              sep = "")
+```
 
 3. Initial MAKER Analysis
 MAKER is pretty easy to get going and relies on properly completed control files. These can be 
@@ -449,46 +454,6 @@ file. In this first round, we will obviously providing the data files for the re
 (rm_gff), the transcriptome assembly (est), and for the other Squamate protein sequences (protein). 
 We will also set the model_org to 'simple' so that only simple repeats are annotated (along with 
 RepeatRunner). Here is the full control file for reference.
-
-
-testing things
-```{r}
-#replace "genome= " "genome=/home/cfia/fna" -- maker_opts.ctl
-x <- "genome= "
-y <- "genome=/home/cfia.fna"
-
-filenames <- paste(sharedPathAn, "test_edit_maker_CTL_files/maker_opts.ctl", sep = "")
-
-for(f in filenames){
-    x <- readLines(f)
-    y <- gsub("genome= ", "genome=/home/cfia.fna ", x)
-    cat(y, file=f, sep="\n")
-}
-
-# must do changes for genome, and protein in the above command. 
-# "protein= ", "protein=/home/CFIA-ACIA/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/References/Botrytis_cinerea.ASM83294v1.pep.all.fa ",
-
-
-
-# Command below will edit the altest, altest_gff, model_org, augustus_species, est2genome, protein2genome,
-# min_contig:
-
-cmd <- paste("/opt/rocks/bin/replace ",
-             "altest= ", 
-             "altest=/home/CFIA-ACIA/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/References/Botrytis_cinerea.ASM83294v1.cdna.all.fa ",
-             "altest_gff= ", "altest_gff=/home/CFIA-ACIA/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/References/Botrytis_cinerea.ASM83294v1.37.gff3 ",
-             "model_org=all ", "model_org=simple ",
-             "augustus_species= ", "augustus_species=botrytis_cinerea ",
-             "est2genome=0 ", "est2genome=1 ",
-             "protein2genome=0 ", "protein2genome=1 ",
-             "min_contig=1 ", "min_contig=1000 ",
-             " -- ", paste(sharedPathAn, "test_edit_maker_CTL_files/maker_opts.ctl", sep = ""),
-             sep = "")
-
-system(cmd)
-```
-
-
 ```{r}
 for(i in 1:length(metadataAssemblies$RepeatDBPath)){
     dir.create(paste(metadataAssemblies$RepeatDBPath[i], "maker_round_1", sep = ""), showWarnings = TRUE, recursive = FALSE)
@@ -496,17 +461,54 @@ for(i in 1:length(metadataAssemblies$RepeatDBPath)){
 
 metadataAssemblies$maker_rnd1_path <- paste(metadataAssemblies$RepeatDBPath, "maker_round_1/", sep = "")
 makerPath <- "/home/CFIA-ACIA/girouxeml/prog/maker/bin/maker"
-
-# go into each of the "paste(metadataAssemblies$RepeatDBPath, "maker_round_1/", sep = "")", and run the command
-# "maker -CTL"
-
-# cd maker_round_1
-# maker -CTL
-
-# Note - I really don't want to be editing all the contrl files manually...
-metadataAssemblies$FixedNewAssemName
-paste(metadataAssemblies$RepeatDBPath, "Full_mask/", metadataAssemblies$SppAbbrv, ".assembly.full_mask.complex.reformat.gff3 ", sep = "")
 ```
+
+Go into each of the "paste(metadataAssemblies$RepeatDBPath, "maker_round_1/", sep = "")", and run the command
+"maker -CTL"
+$ cd maker_round_1
+$ maker -CTL
+```{r}
+# Note - I really don't want to be editing all the contrl files manually...
+paste(metadataAssemblies$RepeatDBPath, "Full_mask/", metadataAssemblies$SppAbbrv, ".assembly.full_mask.complex.reformat.gff3 ", sep = "")
+metadataAssemblies$makerRnd1_CTL_optsPath <- paste(metadataAssemblies$maker_rnd1_path, "maker_opts.ctl", sep = "")
+```
+
+Command below will edit the altest, altest_gff, model_org, augustus_species, est2genome, protein2genome,
+and min_contig:
+```{r}
+cdnaBotcinPath <- paste(sharedPathAn, "References/Botrytis_cinerea.ASM83294v1.cdna.all.fa", sep = "")
+gff3BotcinPath <- paste(sharedPathAn, "References/Botrytis_cinerea.ASM83294v1.37.gff3", sep = "")
+
+cmd <- with(metadataAssemblies,
+            paste("/opt/rocks/bin/replace ",
+                  "altest= ", paste("altest=", cdnaBotcinPath, sep = ""),
+                  " altest_gff= ", paste("altest_gff=", gff3BotcinPath, sep = ""),
+                  " model_org=all ", "model_org=simple ",
+                  "augustus_species= ", "augustus_species=botrytis_cinerea ",
+                  "est2genome=0 ", "est2genome=1 ",
+                  "protein2genome=0 ", "protein2genome=1 ",
+                  "min_contig=1 ", "min_contig=1000 ",
+                  " -- ", makerRnd1_CTL_optsPath,
+                  sep = ""))
+sapply(cmd, function(x) system(x))
+```
+
+testing things
+```{r}
+genomePathsPatterns <- paste("genome=", metadataAssemblies$FixedNewAssemName, sep = "")
+pattern <- "genome= "
+
+for(i in 1:nrow(metadataAssemblies)){
+    makerOptsGenRepl(metadataAssemblies$makerRnd1_CTL_optsPath[i], pattern, genomePathsPatterns[i])
+}
+
+# must do changes for genome, and protein in the above command. 
+# "protein= ", "protein=/home/CFIA-ACIA/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/References/Botrytis_cinerea.ASM83294v1.pep.all.fa ",
+```
+
+
+
+
 
 Create individual bash scripts in each maker_round_1 directory to qsub the runs:
 ```{r}
