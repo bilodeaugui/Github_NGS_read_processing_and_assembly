@@ -756,6 +756,16 @@ the effect of recreating some version of our gene models for these conserved gen
 the internal training that BUSCO can perform (the --long argument) to optimize the HMM search model to 
 train Augustus and produce a trained HMM for MAKER. Here is the command we use to perform the Augustus 
 training inside BUSCO.
+
+In this case, we are using the Pezizomycotina set of conserved genes (N = 3156 genes), so BUSCO 
+will try to identify those genes using BLAST and an initial HMM model for each that comes stocked 
+within the BUSCO database. We specify the -m genome option since we are giving BUSCO regions that 
+include more than just transcripts. The initial HMM model we'll use is the Botrytis cinerea one 
+(-sp botrytis_cinerea), which is a reasonably close species (the closest we'll get). Finally, the --long 
+option tells BUSCO to use the initial gene models it creates to optimize the HMM settings of the raw 
+human HMM, thus training it for our use on Lsue. We can have this run in parallel on several cores, 
+but it will still likely take days, so be patient. Note, some of the options are kept in the config.ini 
+file in the busco/config/ directory.
 ```{r}
 buscoPath <- "/home/CFIA-ACIA/girouxeml/prog/busco/scripts/run_BUSCO.py"
 buscoPezDataSet <- "/home/CFIA-ACIA/girouxeml/prog/busco_datasets/pezizomycotina_odb9/"
@@ -784,31 +794,39 @@ To remove the output files after you are done:
 ```{r}
 # system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
 RemoveQsubTempFiles(sharedPathAn, prefix)
-
 cmd <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd1Path, " && rm -rf tmp ", sep = ""))
 sapply(cmd, function(x) system(x))
 ```
 
-In this case, we are using the Pezizomycotina set of conserved genes (N = 3156 genes), so BUSCO 
-will try to identify those genes using BLAST and an initial HMM model for each that comes stocked 
-within the BUSCO database. We specify the -m genome option since we are giving BUSCO regions that 
-include more than just transcripts. The initial HMM model we'll use is the Botrytis cinerea one 
-(-sp botrytis_cinerea), which is a reasonably close species (the closest we'll get). Finally, the --long 
-option tells BUSCO to use the initial gene models it creates to optimize the HMM settings of the raw 
-human HMM, thus training it for our use on Lsue. We can have this run in parallel on several cores, 
-but it will still likely take days, so be patient. Note, some of the options are kept in the config.ini 
-file in the busco/config/ directory.
 Once BUSCO is complete, it will give you an idea of how complete your annotation is (though be cautious, 
 because we haven't filtered away known alternative transcripts that will be binned as duplicates). We need 
 to do some post-processing of the HMM models to get them ready for MAKER. First, we'll rename the files within
 /Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/snap/round1/run_Lsue_rnd1_maker/augustus_output/retraining_parameters.
 ```{r}
-~/perl5/bin/rename 's/BUSCO_Lsue_rnd1_maker_2899346189/Lsue/g' *
+metadataAssemblies$BuscoOut <- paste(metadataAssemblies$snapRnd1MakerRnd1Path, "run_", metadataAssemblies$SppAbbrv, "_rnd1_maker/", sep = "")
+metadataAssemblies$BuscoRetrainParam <- paste(metadataAssemblies$BuscoOut, "augustus_output/retraining_parameters/", sep = "")
+
+fl <- list.files(metadataAssemblies$BuscoRetrainParam, full.names = TRUE)
+
+# Rather than develo a script, I went to each dir and used rename on the files:
+# ~/perl5/bin/rename 's/BUSCO_Lari_rnd1_maker_1793275218/Lachnellula_arida/g' *
+# ~/perl5/bin/rename 's/BUSCO_Lcer_rnd1_maker_4199910028/Lachnellula_cervina/g' *
+# ~/perl5/bin/rename 's/BUSCO_Lhya_rnd1_maker_50067915/Lachnellula_hyalina/g' *
+# ~/perl5/bin/rename 's/BUSCO_Locc_rnd1_maker_1744752202/Lachnellula_occidentalis/g' * 
+# ~/perl5/bin/rename 's/BUSCO_Lsub_rnd1_maker_1107101620/Lachnellula_subtilissima/g' *
+# ~/perl5/bin/rename 's/BUSCO_Lsue_rnd1_maker_2422236784/Lachnellula_suecica/g' *
+# ~/perl5/bin/rename 's/BUSCO_Lawi_rnd1_maker_4015572171/Lachnellula_willkommii/g' *
 ```
 
 We also need to rename the files cited within certain HMM configuration files.
 ```{r}
-sed -i 's/BUSCO_Lsue_rnd1_maker_2899346189/Lsue/g' Lsue_parameters.cfg
+# sed -i 's/BUSCO_Lari_rnd1_maker_1793275218/Lachnellula_arida/g' Lachnellula_arida_parameters.cfg
+# sed -i 's/BUSCO_Lcer_rnd1_maker_4199910028/Lachnellula_cervina/g' Lachnellula_cervina_parameters.cfg
+# sed -i 's/BUSCO_Lhya_rnd1_maker_50067915/Lachnellula_hyalina/g' Lachnellula_hyalina_parameters.cfg
+# sed -i 's/BUSCO_Locc_rnd1_maker_1744752202/Lachnellula_occidentalis/g' Lachnellula_occidentalis_parameters.cfg
+# sed -i 's/BUSCO_Lsub_rnd1_maker_1107101620/Lachnellula_subtilissima/g' Lachnellula_subtilissima_parameters.cfg
+# sed -i 's/BUSCO_Lsue_rnd1_maker_2422236784/Lachnellula_suecica/g' Lachnellula_suecica_parameters.cfg
+# sed -i 's/BUSCO_Lawi_rnd1_maker_4015572171/Lachnellula_willkommii/g' Lachnellula_willkommii_parameters.cfg
 ```
 
 Finally, we must copy these into the $AUGUSTUS_CONFIG_PATH species HMM location so they are accessible 
@@ -818,9 +836,15 @@ write access to the isilon directory, but I do have it for my local directory.
 
 Do this from within the dir /Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/snap/round1/run_Lsue_rnd1_maker/augustus_output/retraining_parameters/
 ```{r}
-mkdir $AUGUSTUS_CONFIG_PATH/species/Lsue
+for(k in 1:nrow(metadataAssemblies)){
+    dir.create(paste("/home/CFIA-ACIA/girouxeml/prog/augustus/config/species/", metadataAssemblies$ScientificName[k], sep = ""),
+               showWarnings = TRUE, recursive = FALSE)
+}
 
-cp Lsue*  $AUGUSTUS_CONFIG_PATH/species/Lsue/
+cmd <- with(metadataAssemblies,
+            paste("cd ", BuscoRetrainParam, " && cp ", ScientificName, "*", 
+                  " /home/CFIA-ACIA/girouxeml/prog/augustus/config/species/", ScientificName, sep = ""))
+sapply(cmd, function(x) system(x))
 ```
 
 5. MAKER With Ab Initio Gene Predictors
