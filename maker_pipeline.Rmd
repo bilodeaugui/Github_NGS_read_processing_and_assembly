@@ -855,19 +855,36 @@ empicial evidence we have from the first MAKER round, so we don't have to perfor
 Perform the following in the dir: 
 /Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.maker.output/
 
-Transcript alignments - our file will be empty, as we have no est or transcript evidence, so may need to fix this:
 ```{r}
-awk '{ if ($2 == "est2genome") print $0 }' Lsue_rnd1.all.maker.noseq.gff3 > Lsue_rnd1.all.maker.est2genome.gff3
-```
+# Transcript alignments - our file will be empty, as we have no est or transcript evidence, so may need to fix this:
+cmd <- with(metadataAssemblies,
+            paste("cd ", makerRnd1_OutputPath, " && ",
+                  paste(" awk '{ if ", '($2 == "est2genome") print $0 }', "'", sep = ""),
+                  " ", paste(SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""), 
+                  " > ", paste(SppAbbrv, "_rnd1.all.maker.est2genome.gff3", sep = ""),
+                  sep = ""))
+cmd[1]
+sapply(cmd, function(x) system(x))
 
-Protein alignments
-```{r}
-awk '{ if ($2 == "protein2genome") print $0 }' Lsue_rnd1.all.maker.noseq.gff3 > Lsue_rnd1.all.maker.protein2genome.gff3
-```
+# Protein alignments:
+cmd <- with(metadataAssemblies,
+            paste("cd ", makerRnd1_OutputPath, " && ",
+                  paste(" awk '{ if ", '($2 == "protein2genome") print $0 }', "'", sep = ""),
+                  " ", paste(SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""), 
+                  " > ", paste(SppAbbrv, "_rnd1.all.maker.protein2genome.gff3", sep = ""),
+                  sep = ""))
+cmd[1]
+sapply(cmd, function(x) system(x))
 
-Repeat alignments
-```{r}
-awk '{ if ($2 ~ "repeat") print $0 }' Lsue_rnd1.all.maker.noseq.gff3 > Lsue_rnd1.all.maker.repeats.gff3
+# Repeat alignments:
+cmd <- with(metadataAssemblies,
+            paste("cd ", makerRnd1_OutputPath, " && ",
+                  paste(" awk '{ if ", '($2 ~ "repeat") print $0 }', "'", sep = ""),
+                  " ", paste(SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""), 
+                  " > ", paste(SppAbbrv, "_rnd1.all.maker.repeats.gff3", sep = ""),
+                  sep = ""))
+cmd[1]
+sapply(cmd, function(x) system(x))
 ```
 
 I've also included a round of modelling using genemark-es, which is supposed to be especially useful 
@@ -876,11 +893,11 @@ installing one at a time all dependencies using cpanm. Also, there was an error 
 /usr/bin/perl: symbol lookup error: /home/CFIA-ACIA/girouxeml/perl5/lib/perl5/x86_64-linux-thread-multi/auto/List/Util/Util.so: undefined symbol: Perl_xs_apiversion_bootcheck
 The fix was to remove the dir in:
 ```{r}
-~/perl5/lib/perl5/x86_64-linux-thread-multi/auto/List/Util/
+# ~/perl5/lib/perl5/x86_64-linux-thread-multi/auto/List/Util/
 # in the dir:
-cd ~/perl5/lib/perl5/
+# cd ~/perl5/lib/perl5/
 
-mv -f x86_64-linux-thread-multi ~
+# mv -f x86_64-linux-thread-multi ~
 
 # I moved it to the home directory just in case I needed it again if things failed, but it can be deleted completely.
 # See: https://www.reddit.com/r/openbsd/comments/65efvo/openbsd_61_perl_problem_undefined_symbol_perl_xs/ 
@@ -890,9 +907,27 @@ Run Genemark-es:
 in the dir:
 /Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/
 ```{r}
-mkdir genemark-es_round1
+for(k in 1:nrow(metadataAssemblies)){
+    dir.create(paste(metadataAssemblies$maker_rnd1_path[k], "genemark-es_round1", sep = ""),
+               showWarnings = TRUE, recursive = FALSE)
+}
 
-perl ~/prog/genemark-es/gmes_petap.pl --ES --fungus --cores 11 --v --sequence ~/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Assembly_Files/FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.fna
+metadataAssemblies$genemarkEsRnd1Path <- paste(metadataAssemblies$maker_rnd1_path, "genemark-es_round1/", sep = "")
+```
+
+Run The first round of Genemark-es in the maker_round1 dir:
+```{r}
+genemarkPath <- "/home/CFIA-ACIA/girouxeml/prog/genemark-es/gmes_petap.pl"
+
+prefix <- "genemark-ES_rnd1"
+node <- 8
+cmd <- with(metadataAssemblies,
+            paste("cd ", genemarkEsRnd1Path, " && ",
+                  " perl ", genemarkPath, " --ES --fungus --cores ", node, " --v ",
+                  " --sequence ", FixedNewAssemName, sep = ""))
+cmd[1]
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```
 
 Rename the output file to include the organism name:
