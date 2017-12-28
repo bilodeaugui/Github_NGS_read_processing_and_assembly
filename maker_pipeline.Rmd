@@ -536,7 +536,6 @@ maker round 1 directory.
 Given MAKER will be using BLAST to align transcripts and proteins to the genome, this will take at 
 least a couple days with 12 cores. Speed is a product of the resources you allow (more cores == faster) 
 and the assembly quality (smaller, less contiguous scaffolds == longer).
-Once the runs are complete, we will move these?
 ```{r}
 prefix <- "maker_round_1_run_12nodes"
 node <- 12
@@ -612,21 +611,18 @@ For determining which genes are High Confidence for Retraining:
 maker2zffPath <- "/home/CFIA-ACIA/girouxeml/prog/maker/bin/maker2zff"
 
 for(k in 1:nrow(metadataAssemblies)){
-    dir.create(paste(metadataAssemblies$maker_rnd1_path[k], "snap", sep = ""),
-               showWarnings = TRUE, recursive = FALSE)
+    dir.create(paste(metadataAssemblies$maker_rnd1_path[k], "snap", sep = ""), showWarnings = TRUE, recursive = FALSE)
 }
 metadataAssemblies$snapMakerRnd1Path <- paste(metadataAssemblies$maker_rnd1_path, "snap/", sep = "")
 
 for(k in 1:nrow(metadataAssemblies)){
-    dir.create(paste(metadataAssemblies$snapMakerRnd1Path[k], "round1", sep = ""),
-               showWarnings = TRUE, recursive = FALSE)
+    dir.create(paste(metadataAssemblies$snapMakerRnd1Path[k], "round1", sep = ""), showWarnings = TRUE, recursive = FALSE)
 }
 metadataAssemblies$snapRnd1MakerRnd1Path <- paste(metadataAssemblies$snapMakerRnd1Path, "round1/", sep = "")
 
 cmd <- with(metadataAssemblies,
-            paste("cd ", snapRnd1MakerRnd1Path, " && ",
-                  maker2zffPath, " -n -d ", paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1_master_datastore_index.log", sep = ""),
-                  sep = ""))
+            paste("cd ", snapRnd1MakerRnd1Path, " && ", maker2zffPath, " -n -d ", 
+                  paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1_master_datastore_index.log", sep = ""), sep = ""))
 sapply(cmd, function(x) system(x))
 ```
 
@@ -657,7 +653,6 @@ cmd <- with(metadataAssemblies,
                   fathomPath, " ", paste(SppAbbrv, "_rnd1.zff.ann", sep = ""),
                   " ", paste(SppAbbrv, "_rnd1.zff.dna", sep = ""),
                   " -gene-stats > gene-stats.log 2>&1 ", sep = ""))
-
 sapply(cmd, function(x) system(x))
 
 cmd <- with(metadataAssemblies, 
@@ -665,7 +660,6 @@ cmd <- with(metadataAssemblies,
                   fathomPath, " ", paste(SppAbbrv, "_rnd1.zff.ann", sep = ""),
                   " ", paste(SppAbbrv, "_rnd1.zff.dna", sep = ""),
                   " -validate > validate.log 2>&1 ", sep = ""))
-
 sapply(cmd, function(x) system(x))
 ```
 
@@ -676,13 +670,11 @@ cmd <- with(metadataAssemblies,
                   fathomPath, " ", paste(SppAbbrv, "_rnd1.zff.ann", sep = ""),
                   " ", paste(SppAbbrv, "_rnd1.zff.dna", sep = ""),
                   " -categorize 1000 > categorize.log 2>&1 ", sep = ""))
-
 sapply(cmd, function(x) system(x))
 
 cmd <- with(metadataAssemblies,
             paste("cd ", snapRnd1MakerRnd1Path, " && ",
                   fathomPath, " uni.ann uni.dna -export 1000 -plus > uni-plus.log 2>&1 ", sep = ""))
-
 sapply(cmd, function(x) system(x))
 ```
 
@@ -782,7 +774,6 @@ cmd <- with(metadataAssemblies,
                   sep = ""))
 
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
-
 # Note, if the run fails:
 # Segmentation fault (core dumped)
 # Restart the run with the following, it will continue from where it left off. However, check the 
@@ -801,7 +792,7 @@ sapply(cmd, function(x) system(x))
 Once BUSCO is complete, it will give you an idea of how complete your annotation is (though be cautious, 
 because we haven't filtered away known alternative transcripts that will be binned as duplicates). We need 
 to do some post-processing of the HMM models to get them ready for MAKER. First, we'll rename the files within
-/Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/snap/round1/run_Lsue_rnd1_maker/augustus_output/retraining_parameters.
+/maker_round_1/snap/round1/run_Lsue_rnd1_maker/augustus_output/retraining_parameters.
 ```{r}
 metadataAssemblies$BuscoOut <- paste(metadataAssemblies$snapRnd1MakerRnd1Path, "run_", metadataAssemblies$SppAbbrv, "_rnd1_maker/", sep = "")
 metadataAssemblies$BuscoRetrainParam <- paste(metadataAssemblies$BuscoOut, "augustus_output/retraining_parameters/", sep = "")
@@ -818,7 +809,7 @@ fl <- list.files(metadataAssemblies$BuscoRetrainParam, full.names = TRUE)
 # ~/perl5/bin/rename 's/BUSCO_Lawi_rnd1_maker_4015572171/Lachnellula_willkommii/g' *
 ```
 
-We also need to rename the files cited within certain HMM configuration files.
+We also need to rename the files cited within certain HMM configuration files:
 ```{r}
 # sed -i 's/BUSCO_Lari_rnd1_maker_1793275218/Lachnellula_arida/g' Lachnellula_arida_parameters.cfg
 # sed -i 's/BUSCO_Lcer_rnd1_maker_4199910028/Lachnellula_cervina/g' Lachnellula_cervina_parameters.cfg
@@ -834,7 +825,7 @@ by Augustus and MAKER. I had put the $AUGUSTUS_CONFIG_PATH in the .bash_profile,
 directory from the isilon maker pipeline, for maker version 2.10. This is because I do not have 
 write access to the isilon directory, but I do have it for my local directory.
 
-Do this from within the dir /Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/snap/round1/run_Lsue_rnd1_maker/augustus_output/retraining_parameters/
+Do this from within the dir /maker_round_1/snap/round1/run_Lsue_rnd1_maker/augustus_output/retraining_parameters/
 ```{r}
 for(k in 1:nrow(metadataAssemblies)){
     dir.create(paste("/home/CFIA-ACIA/girouxeml/prog/augustus/config/species/", metadataAssemblies$ScientificName[k], sep = ""),
@@ -854,7 +845,6 @@ prediction programs when constructing its models. Before running, let's first re
 empicial evidence we have from the first MAKER round, so we don't have to perform all the BLASTs, etc. again.
 Perform the following in the dir: 
 /Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.maker.output/
-
 ```{r}
 # Transcript alignments - our file will be empty, as we have no est or transcript evidence, so may need to fix this:
 cmd <- with(metadataAssemblies,
@@ -863,7 +853,6 @@ cmd <- with(metadataAssemblies,
                   " ", paste(SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""), 
                   " > ", paste(SppAbbrv, "_rnd1.all.maker.est2genome.gff3", sep = ""),
                   sep = ""))
-cmd[1]
 sapply(cmd, function(x) system(x))
 
 # Protein alignments:
@@ -873,7 +862,6 @@ cmd <- with(metadataAssemblies,
                   " ", paste(SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""), 
                   " > ", paste(SppAbbrv, "_rnd1.all.maker.protein2genome.gff3", sep = ""),
                   sep = ""))
-cmd[1]
 sapply(cmd, function(x) system(x))
 
 # Repeat alignments:
@@ -883,7 +871,6 @@ cmd <- with(metadataAssemblies,
                   " ", paste(SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""), 
                   " > ", paste(SppAbbrv, "_rnd1.all.maker.repeats.gff3", sep = ""),
                   sep = ""))
-cmd[1]
 sapply(cmd, function(x) system(x))
 ```
 
@@ -925,121 +912,125 @@ cmd <- with(metadataAssemblies,
             paste("cd ", genemarkEsRnd1Path, " && ",
                   " perl ", genemarkPath, " --ES --fungus --cores ", node, " --v ",
                   " --sequence ", FixedNewAssemName, sep = ""))
-cmd[1]
-
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
+```
+
+To remove the output files after you are done:
+```{r}
+# system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
+RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
 Rename the output file to include the organism name:
 ```{r}
-mv output/gmhmm.mod output/Lsue_GMES.mod
+cmd <- with(metadataAssemblies,
+            paste("cd ", genemarkEsRnd1Path, " && ",
+                  "mv output/gmhmm.mod output/", paste(SppAbbrv, "_GMES.mod", sep = ""),
+                  sep = ""))
+sapply(cmd, function(x) system(x))
 ```
 
-Now go up to the Lsue_RepeatDB dir, and create a dir for the next round of maker:
-In the dir: /Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/
+Now go up to the RepeatDB dir, and create a dir for the next round of maker:
 ```{r}
-mkdir maker_round_2b
-
-cp maker_round_1/maker_* maker_round_2b/
+for(k in 1:nrow(metadataAssemblies)){
+    dir.create(paste(metadataAssemblies$RepeatDBPath[k], "maker_round_2", sep = ""), 
+               showWarnings = TRUE, recursive = FALSE)
+}
+metadataAssemblies$maker_rnd2_path <- paste(metadataAssemblies$RepeatDBPath, "maker_round_2/", sep = "")
 ```
 
-Then we will modify the previous control file, removing the FASTA sequences files to map and 
+Generate the maker control files for the second round of maker:
+```{r}
+prefix <- "maker_rnd2_CTL"
+cmd <- with(metadataAssemblies,
+            paste("cd ", maker_rnd2_path, " && ", 
+                  makerPath, " -CTL ", sep = ""))
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+metadataAssemblies$makerRnd2_CTL_optsPath <- paste(metadataAssemblies$maker_rnd2_path, "maker_opts.ctl", sep = "")
+metadataAssemblies$makerRnd2_CTL_exePath <- paste(metadataAssemblies$maker_rnd2_path, "maker_exe.ctl", sep = "")
+```
+
+To remove the output files after you are done:
+```{r}
+# system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+Modify the control file, removing the FASTA sequences files to map and 
 replacing them with the GFFs (est_gff, protein_gff, and rm_gff, respectively. We can also 
 specify the path to the Genemark-es .mod, SNAP HMM and the species name for Augustus, so that 
 these gene prediction programs are run. We will also switch est2genome and protein2genome to 0 
-so that gene predictions are based on the Augustus and SNAP gene models. Here is the full version 
-of this control file. Unfortunately we do not have est or transcript evidence to use, so instead I 
+so that gene predictions are based on the Augustus and SNAP gene models. 
+Unfortunately we do not have est or transcript evidence to use, so instead I 
 used the gff3 of the botrytis cinerea model, which may be a mistake. I set est2genome=0. I also 
 installed the trnascan program locally, following the instructions on: 
 https://iamphioxus.org/2016/01/20/installing-trnascan-se-and-snoscan/ and added the 
 following to my .bash_profile:
+$ export Path="/home/CFIA-ACIA/girouxeml/prog/tRNAscan-SE/bin:$PATH"
+$ PERL5LIB=~prog/tRNAscan-SE/bin
 ```{r}
-export Path="/home/CFIA-ACIA/girouxeml/prog/tRNAscan-SE/bin:$PATH"
-PERL5LIB=~prog/tRNAscan-SE/bin
+cmd <- with(metadataAssemblies,
+            paste("/opt/rocks/bin/replace ",
+                  " altest_gff= ", paste("altest_gff=", gff3BotcinPath, sep = ""),
+                  " protein_gff= ", paste("protein_gff=", makerRnd1_OutputPath, SppAbbrv, "_rnd1.all.maker.protein2genome.gff3", sep = ""),
+                  " model_org=all model_org=# ",
+                  " repeat_protein= repeat_protein=# ",
+                  " rm_gff= ", paste("rm_gff=", makerRnd1_OutputPath, SppAbbrv, "_rnd1.all.maker.repeats.gff3", sep = ""),
+                  " snaphmm= ", paste("snaphmm=", snapRnd1MakerRnd1Path, SppAbbrv, "_rnd1.zff.hmm", sep = ""),
+                  " gmhmm= ", paste("gmhmm=", genemarkEsRnd1Path, "output/", SppAbbrv, "_GMES.mod", sep = ""),
+                  " augustus_species= ", paste("augustus_species=", ScientificName, " ", sep = ""),
+                  " trna=0 trna=1 ",
+                  " cpus=1 cpus=21 ",
+                  " max_dna_len=100000 max_dna_len=300000 ",
+                  " -- ", makerRnd2_CTL_optsPath,
+                  sep = ""))
+sapply(cmd, function(x) system(x))
+
+# I also modified the maker_exe.ctl with the local path to tRNAscan:
+pathtRNA_scan <- "/home/CFIA-ACIA/girouxeml/prog/tRNAscan-SE/bin/tRNAscan-SE"
+pathtRNA_scanBioC <- "/opt/bio/tRNAscan-SE/bin/tRNAscan-SE"
+pattern <- paste("tRNAscan-SE=", pathtRNA_scanBioC, sep = "")
+newPattern <- paste("tRNAscan-SE=", pathtRNA_scan, sep = "")
+cmd <- with(metadataAssemblies,
+            paste("/opt/rocks/bin/replace ",
+                  pattern, " ", newPattern, 
+                  " -- ", makerRnd2_CTL_exePath,
+                  sep = ""))
+sapply(cmd, function(x) system(x))
+
+# Edit Genome paths:
+pattern <- "genome= "
+newPattern <- paste("genome=", metadataAssemblies$FixedNewAssemName, sep = "")
+for(i in 1:nrow(metadataAssemblies)){
+    makerOptsGenRepl(metadataAssemblies$makerRnd2_CTL_optsPath[i], pattern, newPattern[i])
+}
 ```
-
-I also modified the maker_exe.ctl with the local path to tRNAscan.
-```{r}
-cat round2_maker_opts.ctl
-```
-#-----Genome (these are always required)
-genome=/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Assembly_Files/FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.fna #genome sequence (fasta file or fasta embeded in GFF3 file)
-organism_type=eukaryotic #eukaryotic or prokaryotic. Default is eukaryotic
-
-#-----Re-annotation Using MAKER Derived GFF3
-maker_gff= #MAKER derived GFF3 file
-est_pass=0 #use ESTs in maker_gff: 1 = yes, 0 = no
-altest_pass=0 #use alternate organism ESTs in maker_gff: 1 = yes, 0 = no
-protein_pass=0 #use protein alignments in maker_gff: 1 = yes, 0 = no
-rm_pass=0 #use repeats in maker_gff: 1 = yes, 0 = no
-model_pass=0 #use gene models in maker_gff: 1 = yes, 0 = no
-pred_pass=0 #use ab-initio predictions in maker_gff: 1 = yes, 0 = no
-other_pass=0 #passthrough anyything else in maker_gff: 1 = yes, 0 = no
-
-#-----EST Evidence (for best results provide a file for at least one)
-est= #set of ESTs or assembled mRNA-seq in fasta format
-altest= #EST/cDNA sequence file in fasta format from an alternate organism
-est_gff= #aligned ESTs or mRNA-seq from an external GFF3 file
-altest_gff=/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Botrytis_cinerea.ASM83294v1.37.gff3 #aligned ESTs from a closly relate species in GFF3 format
-
-#-----Protein Homology Evidence (for best results provide a file for at least one)
-protein= #protein sequence file in fasta format (i.e. from mutiple oransisms)
-protein_gff=/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.maker.output/Lsue_rnd1.all.maker.protein2genome.gff3  #aligned protein homology evidence from an external GFF3 file
-
-#-----Repeat Masking (leave values blank to skip repeat masking)
-model_org= #select a model organism for RepBase masking in RepeatMasker
-rmlib= #provide an organism specific repeat library in fasta format for RepeatMasker
-repeat_protein= #provide a fasta file of transposable element proteins for RepeatRunner
-rm_gff=/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.maker.output/Lsue_rnd1.all.maker.repeats.gff3 #pre-identified repeat elements from an external GFF3 file
-prok_rm=0 #forces MAKER to repeatmask prokaryotes (no reason to change this), 1 = yes, 0 = no
-softmask=1 #use soft-masking rather than hard-masking in BLAST (i.e. seg and dust filtering)
-
-#-----Gene Prediction
-snaphmm=/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/snap/round1/Lsue_rnd1.zff.hmm #SNAP HMM file
-gmhmm=/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/genemark-es_round_1/output/Lsue_GMES.mod #GeneMark HMM file
-augustus_species=Lachnellula_suecica #Augustus gene prediction species model
-fgenesh_par_file= #FGENESH parameter file
-pred_gff= #ab-initio predictions from an external GFF3 file
-model_gff= #annotated gene models from an external GFF3 file (annotation pass-through)
-est2genome=0 #infer gene predictions directly from ESTs, 1 = yes, 0 = no
-protein2genome=0 #infer predictions from protein homology, 1 = yes, 0 = no
-trna=1 #find tRNAs with tRNAscan, 1 = yes, 0 = no
-snoscan_rrna= #rRNA file to have Snoscan find snoRNAs
-unmask=0 #also run ab-initio prediction programs on unmasked sequence, 1 = yes, 0 = no
-
-#-----Other Annotation Feature Types (features MAKER doesn't recognize)
-other_gff= #extra features to pass-through to final MAKER generated GFF3 file
-
-#-----External Application Behavior Options
-alt_peptide=C #amino acid used to replace non-standard amino acids in BLAST databases
-cpus=21 #max number of cpus to use in BLAST and RepeatMasker (not for MPI, leave 1 when using MPI)
-
-#-----MAKER Behavior Options
-max_dna_len=300000 #length for dividing up contigs into chunks (increases/decreases memory usage)
-min_contig=1 #skip genome contigs below this length (under 10kb are often useless)
-
-pred_flank=200 #flank for extending evidence clusters sent to gene predictors
-pred_stats=0 #report AED and QI statistics for all predictions as well as models
-AED_threshold=1 #Maximum Annotation Edit Distance allowed (bound by 0 and 1)
-min_protein=0 #require at least this many amino acids in predicted proteins
-alt_splice=0 #Take extra steps to try and find alternative splicing, 1 = yes, 0 = no
-always_complete=0 #extra steps to force start and stop codons, 1 = yes, 0 = no
-map_forward=0 #map names and attributes forward from old GFF3 genes, 1 = yes, 0 = no
-keep_preds=0 #Concordance threshold to add unsupported gene prediction (bound by 0 and 1)
-
-split_hit=20000 #length for the splitting of hits (expected max intron size for evidence alignments)
-single_exon=0 #consider single exon EST evidence when generating annotations, 1 = yes, 0 = no
-single_length=250 #min length required for single exon ESTs if 'single_exon is enabled'
-correct_est_fusion=0 #limits use of ESTs in annotation to avoid fusion genes
-
-tries=2 #number of times to try a contig if there is a failure for some reason
-clean_try=0 #remove all data from previous run before retrying, 1 = yes, 0 = no
-clean_up=0 #removes theVoid directory with individual analysis files, 1 = yes, 0 = no
-TMP= #specify a directory other than the system default temporary directory for temporary files
-
-
 
 Then we can run MAKER, substituting this new control file, and summarize the output, as we did before.
+```{r}
+prefix <- "maker_round_2_run"
+node <- 22
+
+cmd <- with(metadataAssemblies,
+            paste("cd ", maker_rnd2_path, " && ", makerPath, 
+                  " -base ", paste(SppAbbrv, "_rnd2", sep = ""),
+                  " ", paste(maker_rnd2_path, "maker_opts.ctl", sep = ""),
+                  " ", paste(maker_rnd2_path, "maker_bopts.ctl", sep = ""),
+                  " ", paste(maker_rnd2_path, "maker_exe.ctl", sep = ""),
+                  " -cpus ", node,
+                  sep = ""))
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
+```
+
+To remove the output files after you are done:
+```{r}
+# system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+
 Once the run is complete:
 ```{r}
 cd FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.maker.output/
