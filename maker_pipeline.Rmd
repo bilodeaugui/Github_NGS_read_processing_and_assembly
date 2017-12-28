@@ -766,9 +766,9 @@ cmd <- with(metadataAssemblies,
             paste("cd ", snapRnd1MakerRnd1Path, " && ",
                   "python ", buscoPath, " -i ", paste(SppAbbrv, "_rnd1.all.maker.transcripts1000.fasta", sep = ""),
                   " -o ", paste(SppAbbrv, "_rnd1_maker", sep = ""),
-                  " -l ", buscoPezDataSet, " -m genome -z --augustus_parameters='--progress=true'",
+                  " -l ", buscoPezDataSet, " -m genome -sp botrytis_cinerea -z --augustus_parameters='--progress=true'",
                   #" --restart",
-                  #" -f ", # If forced to restart and there is a problem with the previous run and you shouldn't use restart.
+                  " -f ", # If forced to restart and there is a problem with the previous run and you shouldn't use restart.
                   sep = ""))
 
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
@@ -778,6 +778,15 @@ suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 # Restart the run with the following, it will continue from where it left off. However, check the 
 # config.ini file in ~/prog/busco/config/ to make sure that restart is set to True, and that you adjust 
 # the number of cpu to use according to the qlogin session you have:
+```
+
+To remove the output files after you are done:
+```{r}
+# system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
+RemoveQsubTempFiles(sharedPathAn, prefix)
+
+cmd <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd1Path, " && rm -rf tmp ", sep = ""))
+sapply(cmd, function(x) system(x))
 ```
 
 In this case, we are using the Pezizomycotina set of conserved genes (N = 3156 genes), so BUSCO 
