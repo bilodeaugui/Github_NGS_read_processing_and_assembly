@@ -65,6 +65,13 @@ Define paths to reference files used:
 cdnaBotcinPath <- paste(sharedPathAn, "References/Botrytis_cinerea.ASM83294v1.cdna.all.fa", sep = "")
 gff3BotcinPath <- paste(sharedPathAn, "References/Botrytis_cinerea.ASM83294v1.37.gff3", sep = "")
 pepBotcinPath  <- paste(sharedPathAn, "References/Botrytis_cinerea.ASM83294v1.pep.all.fa", sep = "")
+pepMarbrunPath <- paste(sharedPathAn, "References/Marsonnina_brunnea_GCA_000298775.1_ASM29877v1_protein.faa", sep = "")
+pepSclerscPath <- paste(sharedPathAn, "References/Scerotinia_sclerotiorum_GCF_000146945.2_ASM14694v2_protein.faa", sep = "")
+# Note, require entire proteome froma  min of two related species and perhaps all of UniProt/SwissProt.
+# Marsonnina brunnea available at, https://www.ncbi.nlm.nih.gov/genome/?term=txid698440[orgn]:
+# ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/298/775/GCA_000298775.1_ASM29877v1
+# For Sclerotinia sclerotiorum:
+# https://www.ncbi.nlm.nih.gov/genome/?term=txid5180[orgn]
 ```
 
 We need to specify where we put the assembly files for our genomes. We had this in our
@@ -459,24 +466,27 @@ for(i in 1:length(metadataAssemblies$RepeatDBPath)){
 metadataAssemblies$maker_rnd1_path <- paste(metadataAssemblies$RepeatDBPath, "maker_round_1/", sep = "")
 ```
 
-Generate the maker control files within each maker_round_1:
+Generate the maker control files for the second round of maker:
 ```{r}
+prefix <- "maker_rnd1_CTL"
 cmd <- with(metadataAssemblies, paste("cd ", maker_rnd1_path, " && ", makerPath, " -CTL ", sep = ""))
-sapply(cmd, function(x) system(x))
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 metadataAssemblies$makerRnd1_CTL_optsPath <- paste(metadataAssemblies$maker_rnd1_path, "maker_opts.ctl", sep = "")
+metadataAssemblies$makerRnd1_CTL_exePath <- paste(metadataAssemblies$maker_rnd1_path, "maker_exe.ctl", sep = "")
 ```
 
 Command below will edit the altest, altest_gff, model_org, augustus_species, est2genome, protein2genome, and min_contig:
 ```{r}
 cmd <- with(metadataAssemblies,
-            paste("/opt/rocks/bin/replace ",
-                  "altest= ", paste("altest=", cdnaBotcinPath, sep = ""),
+            paste("/opt/rocks/bin/replace",
+                  " altest= ", paste("altest=", cdnaBotcinPath, sep = ""),
                   " altest_gff= ", paste("altest_gff=", gff3BotcinPath, sep = ""),
                   " model_org=all ", "model_org=simple ",
-                  "augustus_species= ", "augustus_species=botrytis_cinerea ",
-                  "est2genome=0 ", "est2genome=1 ",
-                  "protein2genome=0 ", "protein2genome=1 ",
-                  "min_contig=1 ", "min_contig=1000 ",
+                  " augustus_species= ", "augustus_species=botrytis_cinerea ",
+                  " est2genome=0 ", "est2genome=1 ",
+                  " protein2genome=0 ", "protein2genome=1 ",
+                  " min_contig=1 ", "min_contig=1000 ",
                   " -- ", makerRnd1_CTL_optsPath,
                   sep = ""))
 sapply(cmd, function(x) system(x))
@@ -496,7 +506,7 @@ for(i in 1:nrow(metadataAssemblies)){
 # Edit protein path pattern, using this function to make sure "protein= " is edited, and not
 # "repeat_protein=/home/CFIA-ACIA/girouxeml/prog/maker/data/te_proteins.fasta".
 pattern <- "protein= "
-newPattern <- paste("protein=", pepBotcinPath, sep = "")
+newPattern <- paste("protein=", pepBotcinPath, ",", pepMarbrunPath, ",", pepSclerscPath, sep = "")
 
 for(i in 1:nrow(metadataAssemblies)){
     makerOptsGenRepl(metadataAssemblies$makerRnd1_CTL_optsPath[i], pattern, newPattern)
@@ -516,7 +526,7 @@ Given MAKER will be using BLAST to align transcripts and proteins to the genome,
 least a couple days with 12 cores. Speed is a product of the resources you allow (more cores == faster) 
 and the assembly quality (smaller, less contiguous scaffolds == longer).
 ```{r}
-prefix <- "maker_round_1_run_12nodes"
+prefix <- "maker_round_1_run"
 node <- 12
 cmd <- with(metadataAssemblies,
             paste("cd ", maker_rnd1_path, " && ", makerPath, 
@@ -529,7 +539,7 @@ cmd <- with(metadataAssemblies,
 
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```
-
+*** Over here!!!
 To remove the output files after you are done:
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
@@ -1001,50 +1011,52 @@ for(k in 1:nrow(metadataAssemblies)){
 metadataAssemblies$snapMakerRnd2Path <- paste(metadataAssemblies$maker_rnd2_path, "snap/", sep = "")
 
 for(k in 1:nrow(metadataAssemblies)){
-    dir.create(paste(metadataAssemblies$snapMakerRnd2Path[k], "round2", sep = ""), showWarnings = TRUE, recursive = FALSE)}
-metadataAssemblies$snapRnd2MakerRnd2Path <- paste(metadataAssemblies$snapMakerRnd2Path, "round2/", sep = "")
+    dir.create(paste(metadataAssemblies$snapMakerRnd2Path[k], "round1", sep = ""), showWarnings = TRUE, recursive = FALSE)}
+metadataAssemblies$snapRnd1MakerRnd2Path <- paste(metadataAssemblies$snapMakerRnd2Path, "round1/", sep = "")
 
 cmd <- with(metadataAssemblies,
-            paste("cd ", snapRnd2MakerRnd1Path, " && ", maker2zffPath, " -n -d ", 
+            paste("cd ", snapRnd1MakerRnd2Path, " && ", maker2zffPath, 
+                  # " -x 0.25 -l 50 -c 0 -e 0 -o 0 -d ", # option to filter junky models even w/o EST data avail.
+                  " -n -d ", 
                   paste(makerRnd2_OutputPath, SppAbbrv, "_rnd2_master_datastore_index.log", sep = ""), sep = ""))
 sapply(cmd, function(x) system(x))
 ```
 
 Take a quick look at number of seqs in genome.dna file
 ```{r}
-cmd <- with(metadataAssemblies, paste("cd ", snapRnd2MakerRnd2Path, " && ", 'grep ">" genome.dna | wc -l ', sep = ""))
+cmd <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ", 'grep ">" genome.dna | wc -l ', sep = ""))
 sapply(cmd, function(x) system(x))
 
-cmd <- with(metadataAssemblies, file.rename(paste(snapRnd2MakerRnd2Path, "genome.dna", sep = ""),
-                                            paste(snapRnd2MakerRnd2Path, SppAbbrv, "_rnd2.zff.dna", sep = "")))
+cmd <- with(metadataAssemblies, file.rename(paste(snapRnd1MakerRnd2Path, "genome.dna", sep = ""),
+                                            paste(snapRnd1MakerRnd2Path, SppAbbrv, "_rnd1.zff.dna", sep = "")))
 sapply(cmd, function(x) system(x))
 
-cmd <- with(metadataAssemblies, file.rename(paste(snapRnd2MakerRnd2Path, "genome.ann", sep = ""),
-                                            paste(snapRnd2MakerRnd2Path, SppAbbrv, "_rnd2.zff.ann", sep = "")))
+cmd <- with(metadataAssemblies, file.rename(paste(snapRnd1MakerRnd2Path, "genome.ann", sep = ""),
+                                            paste(snapRnd1MakerRnd2Path, SppAbbrv, "_rnd1.zff.ann", sep = "")))
 sapply(cmd, function(x) system(x))
 ```
 
 Gather some stats and validate:
 ```{r}
-cmd <- with(metadataAssemblies, paste("cd ", snapRnd2MakerRnd2Path, " && ", fathomPath, " ", 
-                                      paste(SppAbbrv, "_rnd2.zff.ann", sep = ""), " ", paste(SppAbbrv, "_rnd2.zff.dna", sep = ""),
+cmd <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ", fathomPath, " ", 
+                                      paste(SppAbbrv, "_rnd1.zff.ann", sep = ""), " ", paste(SppAbbrv, "_rnd1.zff.dna", sep = ""),
                                       " -gene-stats > gene-stats.log 2>&1 ", sep = ""))
 sapply(cmd, function(x) system(x))
 
-cmd <- with(metadataAssemblies, paste("cd ", snapRnd2MakerRnd2Path, " && ", fathomPath, " ", 
-                                      paste(SppAbbrv, "_rnd2.zff.ann", sep = ""), " ", paste(SppAbbrv, "_rnd2.zff.dna", sep = ""),
+cmd <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ", fathomPath, " ", 
+                                      paste(SppAbbrv, "_rnd1.zff.ann", sep = ""), " ", paste(SppAbbrv, "_rnd1.zff.dna", sep = ""),
                                       " -validate > validate.log 2>&1 ", sep = ""))
 sapply(cmd, function(x) system(x))
 ```
 
 Collect the training sequences and annotations, plus 1000 surrounding bp for training
 ```{r}
-cmd <- with(metadataAssemblies, paste("cd ", snapRnd2MakerRnd2Path, " && ", fathomPath, " ", 
-                                      paste(SppAbbrv, "_rnd2.zff.ann", sep = ""), " ", paste(SppAbbrv, "_rnd2.zff.dna", sep = ""),
+cmd <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ", fathomPath, " ", 
+                                      paste(SppAbbrv, "_rnd1.zff.ann", sep = ""), " ", paste(SppAbbrv, "_rnd1.zff.dna", sep = ""),
                                       " -categorize 1000 > categorize.log 2>&1 ", sep = ""))
 sapply(cmd, function(x) system(x))
 
-cmd <- with(metadataAssemblies, paste("cd ", snapRnd2MakerRnd2Path, " && ",
+cmd <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ",
                   fathomPath, " uni.ann uni.dna -export 1000 -plus > uni-plus.log 2>&1 ", sep = ""))
 sapply(cmd, function(x) system(x))
 ```
