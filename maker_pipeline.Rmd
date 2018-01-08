@@ -44,6 +44,7 @@ sharedPathAn <- paste(sharedPath, analysis, sep="")
 
 Define path variables to programs and scripts used:
 ```{r}
+bedtoolsPath    <- "/opt/bio/BEDTools/bin/bedtools"
 buscoPath       <- "/home/CFIA-ACIA/girouxeml/prog/busco/scripts/run_BUSCO.py"
 buscoPezDataSet <- "/home/CFIA-ACIA/girouxeml/prog/busco_datasets/pezizomycotina_odb9/"
 fathomPath      <- "/home/CFIA-ACIA/girouxeml/prog/snap/fathom"
@@ -57,21 +58,32 @@ maker2zffPath   <- "/home/CFIA-ACIA/girouxeml/prog/maker/bin/maker2zff"
 pathtRNA_scan   <- "/home/CFIA-ACIA/girouxeml/prog/tRNAscan-SE/bin/tRNAscan-SE"
 pathtRNA_scanBioC  <- "/opt/bio/tRNAscan-SE/bin/tRNAscan-SE"
 processRepeatsPath <- "/home/CFIA-ACIA/girouxeml/prog/RepeatMasker/ProcessRepeats"
+repMaskerPath   <- "/home/CFIA-ACIA/girouxeml/prog/RepeatMasker/RepeatMasker"
+repModBuildDBPath  <- "/home/CFIA-ACIA/girouxeml/prog/RepeatModeler-open-1.0.11/BuildDatabase"
+repModlerPath <- "/home/CFIA-ACIA/girouxeml/prog/RepeatModeler-open-1.0.11/RepeatModeler"
 rmOutToGFF3Path <- "/home/CFIA-ACIA/girouxeml/prog/RepeatMasker/util/rmOutToGFF3.pl"
 ```
 
 Define paths to reference files used:
+Note, require entire proteome from a  min of two related species and perhaps all of UniProt/SwissProt. See advice for 
+multiple proteomes for homology: https://groups.google.com/forum/#!topic/maker-devel/jbBm_4ycFU8
+Marsonnina brunnea available at: https://www.ncbi.nlm.nih.gov/genome/?term=txid698440[orgn]:
+ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/298/775/GCA_000298775.1_ASM29877v1
+For Sclerotinia sclerotiorum: https://www.ncbi.nlm.nih.gov/genome/?term=txid5180[orgn] 
+All others available from ensemble. Retrieved them based on filtering:
+http://www.uniprot.org/proteomes/?query=reference%3Ayes+AND+taxonomy%3A%22Eukaryota+%5B2759%5D%22+AND+taxonomy%3AHelotiales&sort=score
 ```{r}
-cdnaBotcinPath <- paste(sharedPathAn, "References/Botrytis_cinerea.ASM83294v1.cdna.all.fa", sep = "")
-gff3BotcinPath <- paste(sharedPathAn, "References/Botrytis_cinerea.ASM83294v1.37.gff3", sep = "")
-pepBotcinPath  <- paste(sharedPathAn, "References/Botrytis_cinerea.ASM83294v1.pep.all.fa", sep = "")
-pepMarbrunPath <- paste(sharedPathAn, "References/Marsonnina_brunnea_GCA_000298775.1_ASM29877v1_protein.faa", sep = "")
-pepSclerscPath <- paste(sharedPathAn, "References/Scerotinia_sclerotiorum_GCF_000146945.2_ASM14694v2_protein.faa", sep = "")
-# Note, require entire proteome froma  min of two related species and perhaps all of UniProt/SwissProt.
-# Marsonnina brunnea available at, https://www.ncbi.nlm.nih.gov/genome/?term=txid698440[orgn]:
-# ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/298/775/GCA_000298775.1_ASM29877v1
-# For Sclerotinia sclerotiorum:
-# https://www.ncbi.nlm.nih.gov/genome/?term=txid5180[orgn]
+cdnaBotcinPath  <- paste(sharedPathAn, "References/Botrytis_cinerea.ASM83294v1.cdna.all.fa", sep = "")
+gff3BotcinPath  <- paste(sharedPathAn, "References/Botrytis_cinerea.ASM83294v1.37.gff3", sep = "")
+pepBotcinPath   <- paste(sharedPathAn, "References/Botrytis_cinerea.ASM83294v1.pep.all.fa", sep = "")
+pepBotcinT4Path <- paste(sharedPathAn, "References/Botrytis_cinerea_t4.BotFuc_Mar2011.pep.all.fa", sep = "")
+pepGlarlozPath  <- paste(sharedPathAn, "References/Glarea_lozoyensis_atcc_20868.GLAREA.pep.all.fa", sep = "")
+pepMarbrunPath  <- paste(sharedPathAn, "References/Marsonnina_brunnea_GCA_000298775.1_ASM29877v1_protein.faa", sep = "")
+pepPhiascoPath  <- paste(sharedPathAn, "References/Phialocephala_scopiformis.Phisc1.pep.all.fa", sep = "")
+pepPhiasubPath  <- paste(sharedPathAn, "References/Phialocephala_subalpina.PAC_version_1.pep.all.fa", sep = "")
+pepRhyncomPath  <- paste(sharedPathAn, "References/Rhynchosporium_commune.version_1.pep.all.fa", sep = "")
+pepScleborPath  <- paste(sharedPathAn, "References/Sclerotinia_borealis_f_4128.SBOR_1.pep.all.fa", sep = "")
+pepSclerscPath  <- paste(sharedPathAn, "References/Scerotinia_sclerotiorum_GCF_000146945.2_ASM14694v2_protein.faa", sep = "")
 ```
 
 We need to specify where we put the assembly files for our genomes. We had this in our
@@ -96,37 +108,27 @@ Make a directory within each species-specific directory that will contain all th
 for(k in 1:nrow(metadataAssemblies)){
     dir.create(paste(sharedPathAn, metadataAssemblies$ScientificName[i], "/", 
                      paste(metadataAssemblies$SppAbbrv[i], "RepeatDB", sep = "_"),
-                     sep = ""), showWarnings = TRUE, recursive = FALSE)
-}
+                     sep = ""), showWarnings = TRUE, recursive = FALSE)}
 ```
 
 For each species, build a repeat database for RepeatModeler:
 ```{r}
-i <- 1
+prefix <- "buildDB"
+cmd <- with(metadataAssemblies, 
+            paste("cd ", RepeatDBPath, " && ", repModBuildDBPath, " -name ", SppAbbrv, " ", FixedNewAssemName, sep = ""))
 
-for(i in 1:nrow(metadataAssemblies)){
-    cmd[i] <- paste("BuildDatabase -name ", metadataAssemblies$SppAbbrv[i], " ",
-                 metadataAssemblies$FixedNewAssemName[i],
-                 sep = "")
-    write(cmd[i], file = paste(metadataAssemblies$RepeatDBPath[i], "buildDB.sh", sep = ""),
-          append = FALSE)
-}
-# cd to each directory and run each buildDB.sh bash script on the command line.
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
 Run RepeatModeler using the databases just made for each species:
 ```{r}
-i    <- 1 
-node <- 6 # Number of processors to use when qloged-in for this bash script
+node   <- 6
+prefix <- "repeatModeler"
 
-for(i in 1:nrow(metadataAssemblies)){
-    cmd[i] <- paste("RepeatModeler -pa ", node,
-                    " -database ", metadataAssemblies$SppAbbrv[i],
-                    " 2>&1 | tee repeatmodeler.log ", sep = "")
-    write(cmd[i], file = paste(metadataAssemblies$RepeatDBPath[i], "repeatModeler.sh", sep = ""),
-          append = FALSE)
-}
-# cd to each directory and run each buildDB.sh bash script on the command line.
+cmd <- with(metadataAssemblies,
+            paste("cd ", RepeatDBPath, " && ", repModlerPath, " -pa ", node, " -database ", 
+                  SppAbbrv, " 2>&1 | tee repeatmodeler.log ", sep = ""))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```
 
 Remember to use the modified assemblies that have the extra details that Newbler added after 
@@ -179,7 +181,7 @@ cmd <- paste("cat ", output, " > ", genus, "_", "consensi.fa.classified", sep = 
 write(cmd, file = paste(allSppRepeatDBpath, repModAllsppFileName, sep = ""))
 ```
 
-split unknown and known repeats to separate files using perl scripts (in ~/prog/scripts_pl/):
+Split unknown and known repeats to separate files using perl scripts (in ~/prog/scripts_pl/):
 selectFasta_byIDUnknown.pl  selectFasta_byID_Known.pl
 Note - you need to open these perl scripts and edit them to fix the names you want for input and output,
 and you need to run them in the directory where your input is.
@@ -255,29 +257,25 @@ library is for downstream gene prediction. This step came from an example where 
 combined with several other snakes and annotated.
 
 2. Full Repeat Annotation
-Depending on the species, the de novo library can be fed right into MAKER. We normally do more complex 
-repeat identification with snakes so I will describe that here.
-First, we mask using a currated BovB/CR1 line library to overcome a previously-identified issue with the 
-Repbase annotation. This probably won't be necessary in other species. I used the known library from 
-repeatmasker.lib.EMBL, which I converted to fasta format using RepeatMasker/util/buildRMLibFromEMBL.pl script.
+Depending on the species, the de novo library can be fed right into MAKER, however, based on the very thorough example provided 
+by https://gist.github.com/darencard/bb1001ac1532dd4225b030cf0cd61ce2, we'll be doing a more complex repeat identification.
+First, we mask using a currated library to overcome a previously-identified issue with the Repbase annotation. 
+I used the known library from repeatmasker.lib.EMBL, which I converted to fasta format using RepeatMasker/util/buildRMLibFromEMBL.pl script.
 
 Pass the Lsue assembly through the RepeatMaskerLib.fasta with RepeatMasker:
 ```{r}
-node <- 11   # Number of processors to use when qloged-in for this bash script
-
-for(i in 1:nrow(metadataAssemblies)){
-    prefix <- "embl_mask"
-    cmd <- paste("RepeatMasker -pa ", node,
-                 " -lib ", paste(projRepeatDB, "embl_RepeatMaskerDB/RepeatMasterLib.fasta ", sep = ""),
-                 " -dir . ", metadataAssemblies$FixedNewAssemName[i], sep = "")
-    sharedPathAn2 <- paste(metadataAssemblies$RepeatDBPath[i], sep = "")
-    suffix <- ".sub"; cat(bashDirections); MakeQsubs_test(cmd, prefix, suffix, sharedPathAn2)
+for(i in 1:length(metadataAssemblies$RepeatDBPath)){
+    dir.create(paste(metadataAssemblies$RepeatDBPath[i], "embl_mask", sep = ""), showWarnings = TRUE, recursive = FALSE)
 }
+metadataAssemblies$embl_mask_path <- paste(metadataAssemblies$RepeatDBPath, "embl_mask/", sep = "")
 
-# Note, the -dir option for RepeatMasker doesn't work, and will output all to the head directory where the 
-# bash scripts are written to. In order to have the output of repeatmasker go to the species-specific directories we want, 
-# we must go to each directory for each species and run the bash scripts from within there, and we must also specify that we want the 
-# output to the current directory " -dir . ".
+prefix <- "embl_mask"
+node <- 12
+cmd <- with(metadataAssemblies,
+            paste("cd ", embl_mask_path, " && ", repMaskerPath, " -pa ", node, " -lib ",
+                  paste(projRepeatDB, "embl_RepeatMaskerDB/RepeatMasterLib.fasta ", sep = ""),
+                  " -dir . ", FixedNewAssemName, sep = ""))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```
 
 Then the masked FASTA from this search can be used as input for the next search. I also normally 
@@ -285,34 +283,38 @@ rename the outputs after each round so they are more representative of what they
 using the known and unknown Lachnellula repeat libraries created, split, so that the known elements 
 would be preferentially annotated over unknown, to the degree possible.
 ```{r}
-# Run RepeatMasker with known repeat lib 1st, using as input the embl masked output
-node <- 11  # Number of processors to use when qloged-in for this bash script
-
-for(i in 1:nrow(metadataAssemblies)){
-    prefix <- "Known_Mask"
-    cmd <- paste("RepeatMasker -pa ", node,
-                 " -lib ", paste(allSppRepeatDBpath, "known_Lachnellula_consensi.fa.classified ", sep = ""),
-                 " -dir . ", paste(metadataAssemblies$RepeatDBPath[i], "embl_mask/*.fna.masked", sep = ""), sep = "")
-    sharedPathAn2 <- paste(metadataAssemblies$RepeatDBPath[i], sep = "")
-    suffix <- ".sub"; cat(bashDirections); MakeQsubs_test(cmd, prefix, suffix, sharedPathAn2)
+for(i in 1:length(metadataAssemblies$RepeatDBPath)){
+    dir.create(paste(metadataAssemblies$RepeatDBPath[i], "Known_Mask", sep = ""), showWarnings = TRUE, recursive = FALSE)
 }
+metadataAssemblies$Known_Mask_path <- paste(metadataAssemblies$RepeatDBPath, "Known_Mask/", sep = "")
+
+prefix <- "Known_Mask"
+node <- 12
+cmd <- with(metadataAssemblies,
+            paste("cd ", Known_Mask_path, " && ", repMaskerPath, " -pa ", node, " -lib ",
+                  paste(allSppRepeatDBpath, "known_Lachnellula_consensi.fa.classified", sep = ""),
+                  " -dir . ", paste(embl_mask_path, "*.fna.masked", sep = ""), sep = ""))
+
+# Run RepeatMasker with known repeat lib 1st, using as input the embl masked output
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```
 
 Run RepeatMasker with unknown repeat lib, using as input the unknown masked output. Note, make sure to use the unknown lib
 that was passed through NR, RNA, and BLAST checks to remove repeats that were actually part of genes or functional RNAs.
 ```{r}
-# Run RepeatMasker with unknown repeat lib 2nd, using as input the known masked output
-node <- 11  # Number of processors to use when qloged-in for this bash script
-
-for(i in 1:nrow(metadataAssemblies)){
-    prefix <- "Unknown_Mask"
-    cmd <- paste("RepeatMasker -pa ", node,
-                 " -lib ", paste(allSppRepeatDBpath, "unknown_Lachnellula_consensi.fa.nr.rna.checked.blast.classified ", sep = ""),
-                 " -dir . ", paste(metadataAssemblies$RepeatDBPath[i], "Known_Mask/*.fna.masked.masked", sep = ""), sep = "")
-    sharedPathAn2 <- paste(metadataAssemblies$RepeatDBPath[i], sep = "")
-    suffix <- ".sub"; cat(bashDirections); MakeQsubs_test(cmd, prefix, suffix, sharedPathAn2)
+for(i in 1:length(metadataAssemblies$RepeatDBPath)){
+    dir.create(paste(metadataAssemblies$RepeatDBPath[i], "Unknown_Mask", sep = ""), showWarnings = TRUE, recursive = FALSE)
 }
+metadataAssemblies$Unknown_Mask_path <- paste(metadataAssemblies$RepeatDBPath, "Unknown_Mask/", sep = "")
 
+# Run RepeatMasker with unknown repeat lib 2nd, using as input the known masked output
+prefix <- "Unknown_Mask"
+node <- 12
+cmd <- with(metadataAssemblies,
+            paste("cd ", Unknown_Mask_path, " && ", repMaskerPath, " -pa ", node, " -lib ",
+                  paste(allSppRepeatDBpath, "unknown_Lachnellula_consensi.fa.nr.rna.checked.blast.classified", sep = ""),
+                  " -dir . ", paste(Known_Mask_path, "*.fna.masked.masked", sep = ""), sep = ""))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 # Ignore the segmentation fault errors, these are tries over already masked strings
 ```
 
@@ -372,11 +374,8 @@ suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 Process the repeats:
 ```{r}
 prefix <- "processRepeats"
-cmd <- with(metadataAssemblies, 
-            paste(processRepeatsPath,
-                  " -species fungi ",
-                  paste(RepeatDBPath, "Final_mask/*.full_mask.cat ", sep = ""),
-                  sep = ""))
+cmd <- with(metadataAssemblies, paste(processRepeatsPath, " -species fungi ", 
+                                      paste(RepeatDBPath, "Final_mask/*.full_mask.cat ", sep = ""), sep = ""))
 
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
@@ -386,10 +385,8 @@ Create GFF3:
 ```{r}
 prefix <- "rmOutToGFF3"
 cmd <- with(metadataAssemblies, 
-            paste(rmOutToGFF3Path,
-                  " ", paste(RepeatDBPath, "Full_mask/*.full_mask.out ", sep = ""),
-                  " > ", paste(RepeatDBPath, "Full_mask/", SppAbbrv, ".assembly.full_mask.out.gff3", sep = ""),
-                  sep = ""))
+            paste(rmOutToGFF3Path, " ", paste(RepeatDBPath, "Full_mask/*.full_mask.out ", sep = ""),
+                  " > ", paste(RepeatDBPath, "Full_mask/", SppAbbrv, ".assembly.full_mask.out.gff3", sep = ""), sep = ""))
 
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
@@ -452,13 +449,59 @@ metadataAssemblies$makerFullMaskGFF3 <- paste(metadataAssemblies$RepeatDBPath, "
                                               metadataAssemblies$SppAbbrv, ".assembly.full_mask.complex.reformat.gff3", sep = "")
 ```
 
-3. Initial MAKER Analysis
-MAKER is pretty easy to get going and relies on properly completed control files. These can be 
-generated by issuing the command maker -CTL. The only control file we will be the maker_opts.ctl 
-file. In this first round, we will obviously providing the data files for the repeat annotation 
-(rm_gff), the transcriptome assembly (est), and for the other Squamate protein sequences (protein). 
-We will also set the model_org to 'simple' so that only simple repeats are annotated (along with 
-RepeatRunner). Here is the full control file for reference.
+Before we run Maker, we can run Genemark-es, which requires no other input but the genome assemblies. This is supposed to be especially 
+useful for fungal genomes. Once this is running, you can continue on to the chunk that gets the initial run of Maker going, since it doesn't
+depend on the genemark-es outputs for the first round of Maker.
+It's a bit tricky to install the genemark-es due to dependencies, but works by installing one at a time all
+dependencies using cpanm. Also, there was an error when trying to run it at first:
+/usr/bin/perl: symbol lookup error: /home/CFIA-ACIA/girouxeml/perl5/lib/perl5/x86_64-linux-thread-multi/auto/List/Util/Util.so: undefined symbol: Perl_xs_apiversion_bootcheck
+The fix was to remove the dir in:
+```{r}
+# ~/perl5/lib/perl5/x86_64-linux-thread-multi/auto/List/Util/
+# in the dir:
+# cd ~/perl5/lib/perl5/
+# mv -f x86_64-linux-thread-multi ~
+
+# I moved it to the home directory just in case I needed it again if things failed, but it can be deleted completely.
+# See: https://www.reddit.com/r/openbsd/comments/65efvo/openbsd_61_perl_problem_undefined_symbol_perl_xs/ 
+```
+
+Run Genemark-es in the species RepeatDB directory:
+```{r}
+for(k in 1:nrow(metadataAssemblies)){
+    dir.create(paste(metadataAssemblies$RepeatDBPath[k], "genemark-es_round1", sep = ""), showWarnings = TRUE, recursive = FALSE)}
+metadataAssemblies$genemarkEsRnd1Path <- paste(metadataAssemblies$RepeatDBPath, "genemark-es_round1/", sep = "")
+```
+
+Run The first round of Genemark-es in the maker_round1 dir:
+```{r}
+prefix <- "genemark-ES_rnd1"
+node <- 8
+cmd <- with(metadataAssemblies,
+            paste("cd ", genemarkEsRnd1Path, " && ",
+                  " perl ", genemarkPath, " --ES --fungus --cores ", node, " --v ",
+                  " --sequence ", FixedNewAssemName, sep = ""))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
+```
+
+To remove the output files after you are done:
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+Rename the output file to include the organism name:
+```{r}
+cmd <- with(metadataAssemblies,
+            paste("cd ", genemarkEsRnd1Path, " && ",
+                  "mv output/gmhmm.mod output/", paste(SppAbbrv, "_GMES.mod", sep = ""), sep = ""))
+sapply(cmd, function(x) system(x))
+```
+
+3. Maker Round 1: Initial MAKER Analysis
+MAKER is pretty easy to get going and relies on properly completed control files. In this first round, we will be
+providing the data files for the repeat annotation (rm_gff), the transcriptome assembly (est), and extra protein files from
+related species, which we have retrieved and saved in our References directory. We will also set the model_org to 'simple' 
+so that only simple repeats are annotated (along with RepeatRunner).
 ```{r}
 for(i in 1:length(metadataAssemblies$RepeatDBPath)){
     dir.create(paste(metadataAssemblies$RepeatDBPath[i], "maker_round_1", sep = ""), showWarnings = TRUE, recursive = FALSE)
@@ -466,14 +509,14 @@ for(i in 1:length(metadataAssemblies$RepeatDBPath)){
 metadataAssemblies$maker_rnd1_path <- paste(metadataAssemblies$RepeatDBPath, "maker_round_1/", sep = "")
 ```
 
-Generate the maker control files for the second round of maker:
+Generate the maker control files:
 ```{r}
 prefix <- "maker_rnd1_CTL"
 cmd <- with(metadataAssemblies, paste("cd ", maker_rnd1_path, " && ", makerPath, " -CTL ", sep = ""))
 
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 metadataAssemblies$makerRnd1_CTL_optsPath <- paste(metadataAssemblies$maker_rnd1_path, "maker_opts.ctl", sep = "")
-metadataAssemblies$makerRnd1_CTL_exePath <- paste(metadataAssemblies$maker_rnd1_path, "maker_exe.ctl", sep = "")
+metadataAssemblies$makerRnd1_CTL_exePath  <- paste(metadataAssemblies$maker_rnd1_path, "maker_exe.ctl", sep = "")
 ```
 
 Command below will edit the altest, altest_gff, model_org, augustus_species, est2genome, protein2genome, and min_contig:
@@ -492,36 +535,33 @@ cmd <- with(metadataAssemblies,
 sapply(cmd, function(x) system(x))
 ```
 
-Edit the maker_opts.ctl genome paths, and protein paths and rm_gff (repeat modeler) paths
-to point to desired files:  
+Edit the maker_opts.ctl genome paths, and protein paths and rm_gff (repeat modeler) paths to point to desired files:  
 ```{r}
 # Edit Genome paths:
 newPattern <- paste("genome=", metadataAssemblies$FixedNewAssemName, sep = "")
 pattern <- "genome= "
 
 for(i in 1:nrow(metadataAssemblies)){
-    makerOptsGenRepl(metadataAssemblies$makerRnd1_CTL_optsPath[i], pattern, newPattern[i])
-}
+    makerOptsGenRepl(metadataAssemblies$makerRnd1_CTL_optsPath[i], pattern, newPattern[i])}
 
 # Edit protein path pattern, using this function to make sure "protein= " is edited, and not
 # "repeat_protein=/home/CFIA-ACIA/girouxeml/prog/maker/data/te_proteins.fasta".
 pattern <- "protein= "
-newPattern <- paste("protein=", pepBotcinPath, ",", pepMarbrunPath, ",", pepSclerscPath, sep = "")
+newPattern <- paste("protein=", pepBotcinPath, ",", pepGlarlozPath, ",", pepMarbrunPath, ",", pepPhiascoPath, 
+                    ",", pepPhiasubPath, ",", pepRhyncomPath, ",", pepScleborPath, ",", pepSclerscPath, sep = "")
 
 for(i in 1:nrow(metadataAssemblies)){
-    makerOptsGenRepl(metadataAssemblies$makerRnd1_CTL_optsPath[i], pattern, newPattern)
-}
+    makerOptsGenRepl(metadataAssemblies$makerRnd1_CTL_optsPath[i], pattern, newPattern)}
 
 # Edit repeat modeler, "rm_gff= ", path:
 pattern <- "rm_gff= "
 newPattern <- paste("rm_gff=", metadataAssemblies$makerFullMaskGFF3, sep = "")
 
 for(i in 1:nrow(metadataAssemblies)){
-    makerOptsGenRepl(metadataAssemblies$makerRnd1_CTL_optsPath[i], pattern, newPattern[i])
-}
+    makerOptsGenRepl(metadataAssemblies$makerRnd1_CTL_optsPath[i], pattern, newPattern[i])}
 ```
 
-Then we run MAKER.
+Run MAKER.
 Given MAKER will be using BLAST to align transcripts and proteins to the genome, this will take at 
 least a couple days with 12 cores. Speed is a product of the resources you allow (more cores == faster) 
 and the assembly quality (smaller, less contiguous scaffolds == longer).
@@ -539,7 +579,7 @@ cmd <- with(metadataAssemblies,
 
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```
-*** Over here!!!
+
 To remove the output files after you are done:
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
@@ -576,18 +616,18 @@ sapply(cmd, function(x) system(x))
 ```
 
 4. Training Gene Prediction Software
-Besides mapping the empirical transcript and protein evidence to the reference genome and repeat 
-annotation (not much of this in our example, given we've done so much up front), the most important 
-product of this MAKER run is the gene models. These are what is used for training gene prediction 
-software like augustus and snap.
-SNAP
-SNAP is pretty quick and easy to train. Issuing the following commands will perform the training. It 
-is best to put some thought into what kind of gene models you use from MAKER. Ideally we would 
-like to have sufficient evidence to filter to use models with an AED of 0.25 or better and a length 
-of 50 or more amino acids (maker2zff -x 0.25 -l 50), which helps get rid of junky models, but we do not 
-have enough evidence to support this for our data (no EST or transcript data for our specific organism), 
-and it will result in nothing being returned. Instead, set the options to "-n" (no filters). 
+Besides mapping the empirical transcript and protein evidence to the reference genome and repeat annotation 
+(not much of this in our example, given we've done so much up front), the most important product of this MAKER 
+run is the gene models. These are what is used for training gene prediction software like augustus and snap.
+SNAP: SNAP is pretty quick and easy to train. Issuing the following commands will perform the training. It's best 
+to put some thought into what kind of gene models you use from MAKER. Ideally we would like to have sufficient 
+evidence to filter to use models with an AED of 0.25 or better and a length of 50 or more amino acids 
+(maker2zff -x 0.25 -l 50), which helps get rid of junky models, but we do not have enough evidence to support this 
+for our data (no EST or transcript data for our specific organism), and it will result in nothing being returned. 
+But we can specify all filter parameters so that at least we can filter based on AED and length, and set all other options
+dependent on EST evidence to 0, which is still better than setting it to no filters (-n).
 
+*** Over here!!! Jan 08, 2018
 Export 'confident' gene models from MAKER and rename to something meaningful
 For determining which genes are High Confidence for Retraining:
 ```{r}
@@ -600,7 +640,7 @@ for(k in 1:nrow(metadataAssemblies)){
 metadataAssemblies$snapRnd1MakerRnd1Path <- paste(metadataAssemblies$snapMakerRnd1Path, "round1/", sep = "")
 
 cmd <- with(metadataAssemblies,
-            paste("cd ", snapRnd1MakerRnd1Path, " && ", maker2zffPath, " -n -d ", 
+            paste("cd ", snapRnd1MakerRnd1Path, " && ", maker2zffPath, " -x 0.25 -l 50 -c 0 -e 0 -o 0 -d ", 
                   paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1_master_datastore_index.log", sep = ""), sep = ""))
 sapply(cmd, function(x) system(x))
 ```
@@ -809,8 +849,6 @@ Now let's run a second round of MAKER, but this time we will have Genemark-es, S
 within MAKER to help create more sound gene models. MAKER will use the annotations from these two 
 prediction programs when constructing its models. Before running, let's first recycle the mapping of 
 empicial evidence we have from the first MAKER round, so we don't have to perform all the BLASTs, etc. again.
-Perform the following in the dir: 
-/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.maker.output/
 ```{r}
 # Transcript alignments - our file will be empty, as we have no est or transcript evidence, so may need to fix this:
 cmd <- with(metadataAssemblies,
@@ -837,55 +875,6 @@ cmd <- with(metadataAssemblies,
                   " ", paste(SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""), 
                   " > ", paste(SppAbbrv, "_rnd1.all.maker.repeats.gff3", sep = ""),
                   sep = ""))
-sapply(cmd, function(x) system(x))
-```
-
-I've also included a round of modelling using genemark-es, which is supposed to be especially useful 
-for fungal genomes. It's a bit tricky to install the genemark-es due to dependencies, but works by 
-installing one at a time all dependencies using cpanm. Also, there was an error when trying to run it at first:
-/usr/bin/perl: symbol lookup error: /home/CFIA-ACIA/girouxeml/perl5/lib/perl5/x86_64-linux-thread-multi/auto/List/Util/Util.so: undefined symbol: Perl_xs_apiversion_bootcheck
-The fix was to remove the dir in:
-```{r}
-# ~/perl5/lib/perl5/x86_64-linux-thread-multi/auto/List/Util/
-# in the dir:
-# cd ~/perl5/lib/perl5/
-# mv -f x86_64-linux-thread-multi ~
-
-# I moved it to the home directory just in case I needed it again if things failed, but it can be deleted completely.
-# See: https://www.reddit.com/r/openbsd/comments/65efvo/openbsd_61_perl_problem_undefined_symbol_perl_xs/ 
-```
-
-Run Genemark-es:
-in the dir:
-/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_RepeatDB/maker_round_1/
-```{r}
-for(k in 1:nrow(metadataAssemblies)){
-    dir.create(paste(metadataAssemblies$maker_rnd1_path[k], "genemark-es_round1", sep = ""),
-               showWarnings = TRUE, recursive = FALSE)}
-metadataAssemblies$genemarkEsRnd1Path <- paste(metadataAssemblies$maker_rnd1_path, "genemark-es_round1/", sep = "")
-```
-
-Run The first round of Genemark-es in the maker_round1 dir:
-```{r}
-prefix <- "genemark-ES_rnd1"
-node <- 8
-cmd <- with(metadataAssemblies,
-            paste("cd ", genemarkEsRnd1Path, " && ",
-                  " perl ", genemarkPath, " --ES --fungus --cores ", node, " --v ",
-                  " --sequence ", FixedNewAssemName, sep = ""))
-suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
-```
-
-To remove the output files after you are done:
-```{r}
-RemoveQsubTempFiles(sharedPathAn, prefix)
-```
-
-Rename the output file to include the organism name:
-```{r}
-cmd <- with(metadataAssemblies,
-            paste("cd ", genemarkEsRnd1Path, " && ",
-                  "mv output/gmhmm.mod output/", paste(SppAbbrv, "_GMES.mod", sep = ""), sep = ""))
 sapply(cmd, function(x) system(x))
 ```
 
