@@ -585,35 +585,44 @@ To remove the output files after you are done:
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
-We conclude by assembling 
-together the GFF and FASTA outputs.
+We conclude by assembling together the GFF and FASTA outputs.
 ```{r}
 metadataAssemblies$makerRnd1_OutputPath <- paste(metadataAssemblies$maker_rnd1_path, metadataAssemblies$SppAbbrv, "_rnd1.maker.output/", sep = "")
 
 # GFF with the sequences:
+prefix <- "mergeGFF3_maker_all"
 cmd <- with(metadataAssemblies,
             paste("cd ", makerRnd1_OutputPath, " && ", makerGFF3merge, " -s -d ",
                   paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1_master_datastore_index.log", sep = ""),
-                  " > ", paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1.all.maker.gff3", sep = ""),
-                  sep = ""))
-sapply(cmd, function(x) system(x))
+                  " > ", paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1.all.maker.gff3", sep = ""), sep = ""))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 
 # Collect all the fastas:
-cmd <- with(metadataAssemblies,
-            paste("cd ", makerRnd1_OutputPath, " && ",
-                  makerFastamerge, " -d ",
-                  paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1_master_datastore_index.log", sep = ""),
-                  sep = ""))
-sapply(cmd, function(x) system(x))
+prefix2 <- "fastaMerge_maker"
+cmd2 <- with(metadataAssemblies,
+             paste("cd ", makerRnd1_OutputPath, " && ", makerFastamerge, " -d ",
+                   paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1_master_datastore_index.log", sep = ""),
+                   sep = ""))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 
 # GFF without the sequences:
-cmd <- with(metadataAssemblies,
-            paste("cd ", makerRnd1_OutputPath, " && ", makerGFF3merge, " -n -s -d ",
-                  paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1_master_datastore_index.log", sep = ""),
-                  " > ", paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""),
+prefix3 <- "mergeGFF3_maker_all_noseq" 
+cmd3 <- with(metadataAssemblies,
+             paste("cd ", makerRnd1_OutputPath, " && ", makerGFF3merge, " -n -s -d ",
+                   paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1_master_datastore_index.log", sep = ""),
+                   " > ", paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""),
                   sep = ""))
-sapply(cmd, function(x) system(x))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd3, prefix3, suffix)
 ```
+
+*** Over here!!! Jan 09, 2018
+To remove the output files after you are done:
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+RemoveQsubTempFiles(sharedPathAn, prefix2)
+RemoveQsubTempFiles(sharedPathAn, prefix3)
+```
+
 
 4. Training Gene Prediction Software
 Besides mapping the empirical transcript and protein evidence to the reference genome and repeat annotation 
@@ -627,7 +636,6 @@ for our data (no EST or transcript data for our specific organism), and it will 
 But we can specify all filter parameters so that at least we can filter based on AED and length, and set all other options
 dependent on EST evidence to 0, which is still better than setting it to no filters (-n).
 
-*** Over here!!! Jan 08, 2018
 Export 'confident' gene models from MAKER and rename to something meaningful
 For determining which genes are High Confidence for Retraining:
 ```{r}
@@ -639,12 +647,20 @@ for(k in 1:nrow(metadataAssemblies)){
     dir.create(paste(metadataAssemblies$snapMakerRnd1Path[k], "round1", sep = ""), showWarnings = TRUE, recursive = FALSE)}
 metadataAssemblies$snapRnd1MakerRnd1Path <- paste(metadataAssemblies$snapMakerRnd1Path, "round1/", sep = "")
 
+prefix <- "snapMaker2zff"
 cmd <- with(metadataAssemblies,
             paste("cd ", snapRnd1MakerRnd1Path, " && ", maker2zffPath, " -x 0.25 -l 50 -c 0 -e 0 -o 0 -d ", 
                   paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1_master_datastore_index.log", sep = ""), sep = ""))
-sapply(cmd, function(x) system(x))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
+*** Over here!!! Jan 09, 2018
+To remove the output files after you are done:
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+** Done jan 9
 Take a quick look at number of seqs in genome.dna file
 ```{r}
 cmd <- with(metadataAssemblies,
@@ -662,39 +678,58 @@ cmd <- with(metadataAssemblies,
 sapply(cmd, function(x) system(x))
 ```
 
+** Done Jan 9
 Gather some stats and validate:
 ```{r}
+prefix <- "fathom_MakerRnd1_stats"
 cmd <- with(metadataAssemblies,
             paste("cd ", snapRnd1MakerRnd1Path, " && ",
                   fathomPath, " ", paste(SppAbbrv, "_rnd1.zff.ann", sep = ""),
                   " ", paste(SppAbbrv, "_rnd1.zff.dna", sep = ""),
                   " -gene-stats > gene-stats.log 2>&1 ", sep = ""))
-sapply(cmd, function(x) system(x))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 
-cmd <- with(metadataAssemblies, 
-            paste("cd ", snapRnd1MakerRnd1Path, " && ", 
-                  fathomPath, " ", paste(SppAbbrv, "_rnd1.zff.ann", sep = ""),
-                  " ", paste(SppAbbrv, "_rnd1.zff.dna", sep = ""),
-                  " -validate > validate.log 2>&1 ", sep = ""))
-sapply(cmd, function(x) system(x))
+prefix2 <- "fathom_MakerRnd1_validate"
+cmd2 <- with(metadataAssemblies, 
+             paste("cd ", snapRnd1MakerRnd1Path, " && ", 
+                   fathomPath, " ", paste(SppAbbrv, "_rnd1.zff.ann", sep = ""),
+                   " ", paste(SppAbbrv, "_rnd1.zff.dna", sep = ""),
+                   " -validate > validate.log 2>&1 ", sep = ""))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 ```
 
+*** Over here!!! Jan 09, 2018
+To remove the output files after you are done:
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+RemoveQsubTempFiles(sharedPathAn, prefix2)
+```
+
+** Done Jan 9
 Collect the training sequences and annotations, plus 1000 surrounding bp for training
 ```{r}
+prefix <- "fathom_MakerRnd1_categorize"
 cmd <- with(metadataAssemblies,
             paste("cd ", snapRnd1MakerRnd1Path, " && ",
                   fathomPath, " ", paste(SppAbbrv, "_rnd1.zff.ann", sep = ""),
                   " ", paste(SppAbbrv, "_rnd1.zff.dna", sep = ""),
                   " -categorize 1000 > categorize.log 2>&1 ", sep = ""))
-sapply(cmd, function(x) system(x))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 
-cmd <- with(metadataAssemblies,
-            paste("cd ", snapRnd1MakerRnd1Path, " && ",
-                  fathomPath, " uni.ann uni.dna -export 1000 -plus > uni-plus.log 2>&1 ", sep = ""))
-sapply(cmd, function(x) system(x))
+prefix2 <- "fathom_MakerRnd1_export"
+cmd2 <- with(metadataAssemblies,
+             paste("cd ", snapRnd1MakerRnd1Path, " && ",
+                   fathomPath, " uni.ann uni.dna -export 1000 -plus > uni-plus.log 2>&1 ", sep = ""))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 ```
 
-Note that files with data were created, but the export log is empty  still continuing.
+*** Over here!!! Jan 09, 2018
+To remove the output files after you are done:
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+RemoveQsubTempFiles(sharedPathAn, prefix2)
+```
+** Done Jan 9
 Create the training parameters:
 ```{r}
 for(k in 1:nrow(metadataAssemblies)){
@@ -702,20 +737,31 @@ for(k in 1:nrow(metadataAssemblies)){
                showWarnings = TRUE, recursive = FALSE)
 }
 
+prefix <- "forge_MakerRnd1"
 cmd <- with(metadataAssemblies,
             paste("cd ", paste(snapRnd1MakerRnd1Path, "params/", sep = ""), " && ",
                   forgePath, " ../export.ann ../export.dna > ../forge.log 2>&1 ", sep = ""))
-
-sapply(cmd, function(x) system(x))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
-
+*** Over here!!! Jan 09, 2018
+To remove the output files after you are done:
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+** Done Jan 9
 Assemble the HMM:
 ```{r}
+prefix <- "hmmAssembler_MakerRnd1"
 cmd <- with(metadataAssemblies,
             paste("cd ", snapRnd1MakerRnd1Path, " && ",
                   hmmAssemPath, " ", paste(SppAbbrv, "_rnd1.zff", sep = ""),
                   " params > ", paste(SppAbbrv, "_rnd1.zff.hmm", sep = ""), sep = ""))
-sapply(cmd, function(x) system(x))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+*** Over here!!! Jan 09, 2018
+To remove the output files after you are done:
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
 Augustus
