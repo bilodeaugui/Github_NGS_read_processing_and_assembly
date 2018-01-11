@@ -615,14 +615,12 @@ cmd3 <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd3, prefix3, suffix)
 ```
 
-*** Over here!!! Jan 09, 2018
 To remove the output files after you are done:
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 RemoveQsubTempFiles(sharedPathAn, prefix2)
 RemoveQsubTempFiles(sharedPathAn, prefix3)
 ```
-
 
 4. Training Gene Prediction Software
 Besides mapping the empirical transcript and protein evidence to the reference genome and repeat annotation 
@@ -654,13 +652,11 @@ cmd <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
-*** Over here!!! Jan 09, 2018
 To remove the output files after you are done:
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
-** Done jan 9
 Take a quick look at number of seqs in genome.dna file
 ```{r}
 cmd <- with(metadataAssemblies,
@@ -678,7 +674,6 @@ cmd <- with(metadataAssemblies,
 sapply(cmd, function(x) system(x))
 ```
 
-** Done Jan 9
 Gather some stats and validate:
 ```{r}
 prefix <- "fathom_MakerRnd1_stats"
@@ -698,14 +693,12 @@ cmd2 <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 ```
 
-*** Over here!!! Jan 09, 2018
 To remove the output files after you are done:
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 RemoveQsubTempFiles(sharedPathAn, prefix2)
 ```
 
-** Done Jan 9
 Collect the training sequences and annotations, plus 1000 surrounding bp for training
 ```{r}
 prefix <- "fathom_MakerRnd1_categorize"
@@ -723,13 +716,12 @@ cmd2 <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 ```
 
-*** Over here!!! Jan 09, 2018
 To remove the output files after you are done:
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 RemoveQsubTempFiles(sharedPathAn, prefix2)
 ```
-** Done Jan 9
+
 Create the training parameters:
 ```{r}
 for(k in 1:nrow(metadataAssemblies)){
@@ -743,12 +735,12 @@ cmd <- with(metadataAssemblies,
                   forgePath, " ../export.ann ../export.dna > ../forge.log 2>&1 ", sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
-*** Over here!!! Jan 09, 2018
+
 To remove the output files after you are done:
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
-** Done Jan 9
+
 Assemble the HMM:
 ```{r}
 prefix <- "hmmAssembler_MakerRnd1"
@@ -758,7 +750,7 @@ cmd <- with(metadataAssemblies,
                   " params > ", paste(SppAbbrv, "_rnd1.zff.hmm", sep = ""), sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
-*** Over here!!! Jan 09, 2018
+
 To remove the output files after you are done:
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
@@ -778,6 +770,7 @@ together training sequences using the gene models we created in our first run
 of MAKER. We do this by issuing the following command to excise the regions that contain mRNA 
 annotations based on our initial MAKER run (with 1000bp on each side).
 ```{r}
+prefix <- "maker-augustus_get_mRNA_regions_Rnd1"
 cmd <- with(metadataAssemblies,
             paste("cd ", snapRnd1MakerRnd1Path, " && ",
                   paste(' awk -v OFS="\t" \'{ if ($3 == "mRNA") print $1, $4, $5 }\'', sep = ""),
@@ -787,8 +780,14 @@ cmd <- with(metadataAssemblies,
                   " | \ ",
                   bedToolsPath, " getfasta -fi ", FixedNewAssemName, " -bed - -fo ",
                   paste(SppAbbrv, "_rnd1.all.maker.transcripts1000.fasta", sep = "")))
+cmd[1]
+# Note, open the bash scripts, and edit so put the "\t" back in.
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
 
-sapply(cmd, function(x) system(x))
+To remove the output files after you are done:
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
 There are some important things to note based on this approach. First is that you will likely 
@@ -816,16 +815,17 @@ option tells BUSCO to use the initial gene models it creates to optimize the HMM
 human HMM, thus training it for our use on Lsue. We can have this run in parallel on several cores, 
 but it will still likely take days, so be patient. Note, some of the options are kept in the config.ini 
 file in the busco/config/ directory.
+** Done Jan 11 - check to see if all completed successfully, and not seg fault, core dumped.
 ```{r}
 prefix <- "Busco_MakerRnd1"
 node <- 8
 cmd <- with(metadataAssemblies,
             paste("cd ", snapRnd1MakerRnd1Path, " && ",
                   "python ", buscoPath, " -i ", paste(SppAbbrv, "_rnd1.all.maker.transcripts1000.fasta", sep = ""),
-                  " -o ", paste(SppAbbrv, "_rnd1_maker", sep = ""),
+                  " -o ", paste(SppAbbrv, "_rnd1_maker", sep = ""), " -c ", node,
                   " -l ", buscoPezDataSet, " -m genome -sp botrytis_cinerea -z --augustus_parameters='--progress=true'",
-                  #" --restart",
-                  " -f ", # If forced to restart and there is a problem with the previous run and you shouldn't use restart.
+                  " --restart",
+                  #" -f ", # If forced to restart and there is a problem with the previous run and you shouldn't use restart.
                   sep = ""))
 
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
@@ -833,6 +833,7 @@ suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 # config.ini file in ~/prog/busco/config/ to make sure that restart is set to True, and that you adjust to the correct cpus number.
 ```
 
+** Not done Jan 11
 To remove the output files after you are done:
 ```{r}
 # system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
@@ -851,7 +852,7 @@ metadataAssemblies$BuscoRetrainParam <- paste(metadataAssemblies$BuscoOut, "augu
 
 fl <- list.files(metadataAssemblies$BuscoRetrainParam, full.names = TRUE)
 
-# Rather than develo a script, I went to each dir and used rename on the files:
+# Rather than develop a script, I went to each dir and used rename on the files:
 # ~/perl5/bin/rename 's/BUSCO_Lari_rnd1_maker_1793275218/Lachnellula_arida/g' *
 # ~/perl5/bin/rename 's/BUSCO_Lcer_rnd1_maker_4199910028/Lachnellula_cervina/g' *
 # ~/perl5/bin/rename 's/BUSCO_Lhya_rnd1_maker_50067915/Lachnellula_hyalina/g' *
@@ -890,6 +891,7 @@ cmd <- with(metadataAssemblies,
 sapply(cmd, function(x) system(x))
 ```
 
+** Not done Jan 11
 5. MAKER With Ab Initio Gene Predictors
 Now let's run a second round of MAKER, but this time we will have Genemark-es, SNAP and Augustus run 
 within MAKER to help create more sound gene models. MAKER will use the annotations from these two 
@@ -897,31 +899,41 @@ prediction programs when constructing its models. Before running, let's first re
 empicial evidence we have from the first MAKER round, so we don't have to perform all the BLASTs, etc. again.
 ```{r}
 # Transcript alignments - our file will be empty, as we have no est or transcript evidence, so may need to fix this:
+prefix <- "maker_rnd2_transcript_evidence"
 cmd <- with(metadataAssemblies,
             paste("cd ", makerRnd1_OutputPath, " && ",
                   paste(" awk '{ if ", '($2 == "est2genome") print $0 }', "'", sep = ""),
                   " ", paste(SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""), 
                   " > ", paste(SppAbbrv, "_rnd1.all.maker.est2genome.gff3", sep = ""),
                   sep = ""))
-sapply(cmd, function(x) system(x))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 
 # Protein alignments:
+prefix2 <- "maker_rnd2_protein_evidence"
 cmd <- with(metadataAssemblies,
             paste("cd ", makerRnd1_OutputPath, " && ",
                   paste(" awk '{ if ", '($2 == "protein2genome") print $0 }', "'", sep = ""),
                   " ", paste(SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""), 
                   " > ", paste(SppAbbrv, "_rnd1.all.maker.protein2genome.gff3", sep = ""),
                   sep = ""))
-sapply(cmd, function(x) system(x))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix2, suffix)
 
 # Repeat alignments:
+prefix3 <- "maker_rnd2_repeat_evidence"
 cmd <- with(metadataAssemblies,
             paste("cd ", makerRnd1_OutputPath, " && ",
                   paste(" awk '{ if ", '($2 ~ "repeat") print $0 }', "'", sep = ""),
                   " ", paste(SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""), 
                   " > ", paste(SppAbbrv, "_rnd1.all.maker.repeats.gff3", sep = ""),
                   sep = ""))
-sapply(cmd, function(x) system(x))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix3, suffix)
+```
+** Not done Jan 11
+To remove the output files after you are done:
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+RemoveQsubTempFiles(sharedPathAn, prefix2)
+RemoveQsubTempFiles(sharedPathAn, prefix3)
 ```
 
 Now go up to the RepeatDB dir, and create a dir for the next round of maker:
