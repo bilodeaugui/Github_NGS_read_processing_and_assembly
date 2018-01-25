@@ -44,6 +44,7 @@ sharedPathAn <- paste(sharedPath, analysis, sep="")
 
 Define path variables to programs and scripts used:
 ```{r}
+aedCDFgenePath  <- "/home/CFIA-ACIA/girouxeml/prog/scripts_pl/AED_cdf_generator.pl"
 bedtoolsPath    <- "/opt/bio/BEDTools/bin/bedtools"
 buscoPath       <- "/home/CFIA-ACIA/girouxeml/prog/busco/scripts/run_BUSCO.py"
 buscoPezDataSet <- "/home/CFIA-ACIA/girouxeml/prog/busco_datasets/pezizomycotina_odb9/"
@@ -469,7 +470,6 @@ for(k in 1:nrow(metadataAssemblies)){
 metadataAssemblies$genemarkEsRnd1Path <- paste(metadataAssemblies$RepeatDBPath, "genemark-es_round1/", sep = "")
 ```
 
-*** Over here - got to this point for the assembly of Lawi (Lawi2) that is a hybrid of IonT and MiSeq data from Marco - 24Jan2018
 Run The first round of Genemark-es in the maker_round1 dir:
 ```{r}
 prefix <- "genemark-ES_rnd1"
@@ -529,6 +529,7 @@ cmd <- with(metadataAssemblies,
                   " min_contig=1 ", "min_contig=1000 ",
                   " -- ", makerRnd1_CTL_optsPath,
                   sep = ""))
+
 sapply(cmd, function(x) system(x))
 ```
 
@@ -699,7 +700,11 @@ cmd <- with(metadataAssemblies,
                   " ", paste(SppAbbrv, "_rnd1.zff.dna", sep = ""),
                   " -categorize 1000 > categorize.log 2>&1 ", sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
 
+Wait for the chunk above to complete before running this next one. It depends on the output from the 
+previous as input.
+```{r}
 prefix2 <- "fathom_MakerRnd1_export"
 cmd2 <- with(metadataAssemblies,
              paste("cd ", snapRnd1MakerRnd1Path, " && ",
@@ -807,6 +812,7 @@ but it will still likely take days, so be patient. Note, some of the options are
 file in the busco/config/ directory. Also, if during the run it keeps crashing with segmentation fault, core
 dumped, it may be an error with the threading. Try running on just one core. May take a lot longer though,
 but at least it's still moving along.
+*** Over here - got to this point for the assembly of Lawi (Lawi2) that is a hybrid of IonT and MiSeq data from Marco - 25Jan2018
 ```{r}
 prefix <- "Busco_MakerRnd1"
 node <- 8
@@ -1005,9 +1011,6 @@ for(i in 1:nrow(metadataAssemblies)){
     makerOptsGenRepl(metadataAssemblies$makerRnd2_CTL_optsPath[i], pattern, newPattern[i])}
 ```
 
-
-** Over here!! All species assemblies, except Lawi2 had this started 24jan2018.
-
 Then we can run MAKER, substituting this new control file, and summarize the output, as we did before.
 ```{r}
 prefix <- "maker_round_2_run"
@@ -1124,7 +1127,14 @@ cmd    <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ", f
                                       paste(SppAbbrv, "_rnd2.zff.ann", sep = ""), " ", paste(SppAbbrv, "_rnd2.zff.dna", sep = ""),
                                       " -categorize 1000 > categorize.log 2>&1 ", sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+To remove the output files after you are done:
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
 
+Wait for the categorize run to finish before doing the export, which is next.
+```{r}
 prefix2 <- "round2_fathom_export"
 cmd2    <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ",
                    fathomPath, " uni.ann uni.dna -export 1000 -plus > uni-plus.log 2>&1 ", sep = ""))
@@ -1133,7 +1143,7 @@ suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 
 To remove the output files after you are done:
 ```{r}
-RemoveQsubTempFiles(sharedPathAn, prefix); RemoveQsubTempFiles(sharedPathAn, prefix2)
+RemoveQsubTempFiles(sharedPathAn, prefix2)
 ```
 
 Create the training parameters:
@@ -1203,6 +1213,7 @@ https://groups.google.com/forum/#!topic/maker-devel/FhlVr1pKPw4
 
 Run BUSCO again, with Pezizomycotina set of conserved genes, as in round 1. However, for Augustus,
 we will specify our species-specific HMM models. 
+** Over here!! All species assemblies, except Lawi2 had this started 25jan2018
 ```{r}
 prefix <- "round2_Busco"
 node   <- 8
@@ -1211,7 +1222,7 @@ cmd    <- with(metadataAssemblies,
                      "python ", buscoPath, " -i ", paste(SppAbbrv, "_rnd2.all.maker.transcripts1000.fasta", sep = ""),
                      " -o ", paste(SppAbbrv, "_rnd2_maker", sep = ""), " -c ", node,
                      " -l ", buscoPezDataSet, " -m genome -sp ", ScientificName, " -z --augustus_parameters='--progress=true'",
-                     " --restart ", 
+                     " --long --restart ", 
                      " --force ", 
                      sep = ""))
 
@@ -1219,7 +1230,7 @@ suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 # Note, if the run fails, restart the run with the following "--restart", it will continue from where it left off. However, check the 
 # config.ini file in ~/prog/busco/config/ to make sure that restart is set to True, and that you adjust to the correct cpus number.
 ```
-**** Over here 18Jan2018
+
 To remove the output files after you are done:
 ```{r}
 # system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
@@ -1276,78 +1287,76 @@ cmd <- with(metadataAssemblies,
                   " /home/CFIA-ACIA/girouxeml/prog/augustus/config/species/", ScientificName, sep = ""))
 sapply(cmd, function(x) system(x))
 ```
-##########################################################################################################
 
-
+# We've now completed the 2nd round of Maker, and run a second Augustus training session using BUSCO. 
+# We can see how things are going by evaluating the gene models we have so far:
+A. Count the number of gene models and the gene lengths:
+I manually recorded the output values to a summary BUSCO excel file. Welcome to ideas on how to capture the output.
 ```{r}
-# cat FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.maker.output/Lsue_rnd2b.all.maker.gff3 | awk '{ if ($3 == "gene") print $0 }' | awk '{ sum += ($5 - $4) } END { print NR, sum / NR }'
-# for round1: 8067 1849.07
-# for round2: 7084 1652.54
+cmd <- with(metadataAssemblies, 
+            paste("cd ", makerRnd2_OutputPath, " && ", " cat ", SppAbbrv, "_rnd2.all.maker.gff3 ", 
+                  " | awk '{ if ($3 ==", '"gene") print $0}', 
+                  "' | awk '{ sum += ($5 - $4) } END { print NR, sum / NR }'", sep = ""))
 
-# perl ~/prog/scripts_pl/AED_cdf_generator.pl -b 0.025 FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022_mod_removedlLessThan200_contig00022trid_rim.maker.output/Lsue_rnd2b.all.maker.gff3
-# for round1: 0.500 = 0.988
-# for round2: 0.500 = 0.991
+cmd[1]
+sapply(cmd, function(x) system(x))
+```
 
-cd snap/round2/
+B. Visualize the AED distribution. AED ranges from 0 to 1 and quantifies the confidence in a gene model 
+based on empirical evidence. Basically, the lower the AED, the better a gene model is likely to be. Ideally, 
+95% or more of the gene models will have an AED of 0.5 or better in the case of good assemblies. You can use 
+this AED_cdf_generator.pl script to help with this.
+I have just recorded the fraction at 0.5 into my summary excel table. Open to ideas on how to capture it better. 
+```{r}
+cmd <- with(metadataAssemblies, 
+            paste("cd ", makerRnd2_OutputPath, " && ", " perl ", aedCDFgenePath, 
+                  " -b 0.025 ", SppAbbrv, "_rnd2.all.maker.gff3", sep = "")) 
+cmd[1]
+sapply(cmd, function(x) system(x))
+```
 
-awk -v OFS="\t" '{ if ($3 == "mRNA") print $1, $4, $5 }' ../../FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022_trim.maker.output/Lsue_rnd2.all.maker.noseq.gff3 | \
-  awk -v OFS="\t" '{ if ($2 < 1000) print $1, "0", $3+1000; else print $1, $2-1000, $3+1000 } ' | \
-  bedtools getfasta -fi ~/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Assembly_Files/FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.fna -bed - -fo Lsue_rnd2.all.maker.transcripts1000.fasta
+C. Run BUSCO using the Augustus species HMM to look at the results, without training Augustus. Only include the 
+transcript sequences, and not the 1000 bp on each side, and be sure to take the best (i.e., longest) transcript for
+each gene so we aren't artificially seeding duplicates. We could also run it on the best protein sequence per gene
+instead. 
+```{r}
+prefix <- "round2_eval_with_Busco"
+node   <- 8
+cmd    <- with(metadataAssemblies,
+               paste("cd ", makerRnd2_OutputPath, " && ",
+                     "python ", buscoPath, " -i ", paste(SppAbbrv, "_rnd2.all.maker.transcripts.fasta", sep = ""),
+                     " -o annotation_eval ", " -c ", node,
+                     " -l ", buscoPezDataSet, " -m transcriptome -sp ", ScientificName, " -z --augustus_parameters='--progress=true'",
+                     " --restart ", 
+                     " --force ", 
+                     sep = ""))
 
-grep ">" Lsue_rnd2.all.maker.transcripts1000.fasta | wc -l
-5782
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
+# Note, if the run fails, restart the run with the following "--restart", it will continue from where it left off. However, check the 
+# config.ini file in ~/prog/busco/config/ to make sure that restart is set to True, and that you adjust to the correct cpus number.
+```
 
-python ~/prog/busco/scripts/run_BUSCO.py --in Lsue_rnd2.all.maker.transcripts1000.fasta --out Lsue_rnd2_maker --lineage_path ~/prog/busco_datasets/pezizomycotina_odb9/ --mode genome --cpu 7 --long --tarzip --restart --species Lsue --augustus_parameters='--progress=true'
-
-cd run_Lsue_rnd2_maker/augustus_output/retraining_paramters/
-~/perl5/bin/rename 's/BUSCO_Bcon_rnd2_maker_2277442865/Boa_constrictor/g' *
+D. Visualise the gene models from Augustus, SNAP, and MAKER, also Genemark-es using a genome browser such as JBrowse.
+With JBrowse, you can essentially follow this guide to get this started. A helpful resource is this gff2jbrowse.pl script, 
+which automates adding tracks to the browser based on the GFF output of your MAKER run. It is best to use 5-10 longer, gene 
+dense scaffolds and visually inspect them. When SNAP and Augustus are well trained, their models should overlap pretty 
+closely with the final MAKER models. Moreover, there will be spurious hits from SNAP and Augustus, but they are usually short, 
+1-2 exon annotations and don't have empirical support. You'll get a sense of a good annotation with some experience. Also, it 
+is possible SNAP won't produce good results, depending on your organism, which the MAKER folks have pointed out in the 
+past (Augustus usually does pretty well).
+```{r}
+# Have yet to determine quickest way to do this on our cluster.
 ```
 
 6. Iteratively Running MAKER to Improve Annotation
-One of the beauties of MAKER is that it can be run iteratively, using the gene models 
-from the one round to train ab initio software to improve the inference of gene models 
-in the next round. Essentially, all one has to do is repeat steps 4 and 5 to perform another 
-round of annotation. The MAKER creators/maintainers recommend at least a couple rounds of 
-ab initio software training and MAKER annotation (i.e., 3 rounds total) and returns start to 
-diminish (at differing rates) thereafter. One needs to be careful not to overtrain Augustus and SNAP, 
-so more rounds isn't necessarily always better. Below are a few ways of evaluating your gene models 
-after successive rounds of MAKER to identify when you have sound models.
+One of the beauties of MAKER is that it can be run iteratively, using the gene models from the one round to train 
+ab initio software to improve the inference of gene models in the next round. Essentially, all one has to do is repeat 
+steps 4 and 5 to perform another round of annotation. The MAKER creators/maintainers recommend at least a couple rounds 
+of ab initio software training and MAKER annotation (i.e., 3 rounds total) and returns start to diminish (at differing rates) 
+thereafter. One needs to be careful not to overtrain Augustus and SNAP, so more rounds isn't necessarily always better. 
+Keep evaluating your gene models after successive rounds of MAKER to identify when you have sound models.
 
-A. Count the number of gene models and the gene lengths after each round.
-cat <roundN.full.gff> | awk '{ if ($3 == "gene") print $0 }' | awk '{ sum += ($5 - $4) } END { print NR, sum / NR }'
-For example:
-```{r}
-cat FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.maker.output/Lsue_rnd2b.all.maker.gff3 | awk '{ if ($3 == "gene") print $0 }' | awk '{ sum += ($5 - $4) } END { print NR, sum / NR }'
-```
-
-B. Visualize the AED distribution. AED ranges from 0 to 1 and quantifies the confidence 
-in a gene model based on empirical evidence. Basically, the lower the AED, the better a 
-gene model is likely to be. Ideally, 95% or more of the gene models will have an AED of 0.5 or 
-better in the case of good assemblies. You can use this AED_cdf_generator.pl script to help with this.
-perl AED_cdf_generator.pl -b 0.025 <roundN.full.gff>
-i.e., 
-```{r}
-perl ~/prog/scripts_pl/AED_cdf_generator.pl -b 0.025 FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022_mod_removedlLessThan200_contig00022trid_rim.maker.output/Lsue_rnd2b.all.maker.gff3
-```
-
-C. Run BUSCO one last time using the species Augustus HMM and take a look at the results 
-(this will be quick since we are not training Augustus). Also, only include the transcript 
-sequences (not the 1000 bp on each side) and be sure to take the best (i.e., longest) transcript 
-for each gene so you aren't artificially seeding duplicates. You can also run it on the best protein 
-sequence per gene instead. Your command will be some derivative of the following:
-BUSCO.py -i <roundN.transcripts.fasta>  -o annotation_eval -l tetrapoda_odb9/ \
-  -m transcriptome -c 8 -sp Boa_constrictor -z --augustus_parameters='--progress=true'
-
-D. Visualize the gene models from Augustus, SNAP, and MAKER using a genome browser. 
-JBrowse is a good option for this. You can essentially follow this guide to get this started. 
-A helpful resource is this gff2jbrowse.pl script, which automates adding tracks to the browser 
-based on the GFF output of your MAKER run. It is best to use 5-10 longer, gene dense scaffolds 
-and visually inspect them. When SNAP and Augustus are well trained, their models should overlap 
-pretty closely with the final MAKER models. Moreover, there will be spurious hits from SNAP and 
-Augustus, but they are usually short, 1-2 exon annotations and don't have empirical support. 
-You'll get a sense of a good annotation with some experience. Also, it is possible SNAP won't 
-produce good results, depending on your organism, which the MAKER folks have pointed out in the 
-past (Augustus usually does pretty well).
+## Running round 3 of Maker:
 
 
 
