@@ -63,13 +63,13 @@ repModlerPath <- "/home/CFIA-ACIA/girouxeml/prog/RepeatModeler-open-1.0.11/Repea
 rmOutToGFF3Path <- "/home/CFIA-ACIA/girouxeml/prog/RepeatMasker/util/rmOutToGFF3.pl"
 ```
 
-**Define paths to reference files used:**
+**Define paths to reference files used:**  
 **Note,** require entire proteome from a  min of two related species and perhaps all of UniProt/SwissProt. 
-See advice for multiple proteomes for homology: https://groups.google.com/forum/#!topic/maker-devel/jbBm_4ycFU8
+See advice for multiple proteomes for homology: https://groups.google.com/forum/#!topic/maker-devel/jbBm_4ycFU8  
 **_Marsonnina brunnea_** available at: https://www.ncbi.nlm.nih.gov/genome/?term=txid698440[orgn]:
-ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/298/775/GCA_000298775.1_ASM29877v1
-For **_Sclerotinia sclerotiorum_**: https://www.ncbi.nlm.nih.gov/genome/?term=txid5180[orgn] 
-All others available from ensemble. Retrieved them based on filtering:
+ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/298/775/GCA_000298775.1_ASM29877v1  
+For **_Sclerotinia sclerotiorum_**: https://www.ncbi.nlm.nih.gov/genome/?term=txid5180[orgn]   
+All others available from ensemble. Retrieved them based on filtering:  
 http://www.uniprot.org/proteomes/?query=reference%3Ayes+AND+taxonomy%3A%22Eukaryota+%5B2759%5D%22+AND+taxonomy%3AHelotiales&sort=score
 ```{r}
 cdnaBotcinPath  <- paste(sharedPathAn, "References/Botrytis_cinerea.ASM83294v1.cdna.all.fa", sep = "")
@@ -85,7 +85,7 @@ pepScleborPath  <- paste(sharedPathAn, "References/Sclerotinia_borealis_f_4128.S
 pepSclerscPath  <- paste(sharedPathAn, "References/Scerotinia_sclerotiorum_GCF_000146945.2_ASM14694v2_protein.faa", sep = "")
 ```
 
-**Read in the metadata table:**
+**Read in the metadata table:**  
 We need to specify where we put the assembly files for our genomes. We had this in our metadataAssembly table 
 from our previous script we ran called "RstudioScript-June2017_LachnellulaSpp_assemblies.Rmd"
 We can either read in the table, or take what we have fromt he environment. Reading in the table is better.
@@ -95,7 +95,7 @@ metadataAssemblies <- fread(paste(sharedPathAn, "Lachnellula_genomes_MetadataAss
 metadataAssemblies[, V1:=NULL]
 ```
 
-### 1. De novo Repeat Identification
+### 1. De novo Repeat Identification.
 The first, and very important, step to genome annotation is identifying repetitive content. Existing libraries 
 from Repbase or from internal efforts are great, but it is also important to identify repeats de novo from your reference 
 genome using RepeatModeler. This is pretty easy to do and normally only takes a couple days using 8-12 cores.  
@@ -136,12 +136,12 @@ suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 
 **Note:**
 Remember to use the modified assemblies that have the extra details that Newbler added after the >contig 
-name (3 tabs for contig name, length and some other detail) removed because this info created problems downstream.  
-**Note,** if there is an unexpected system failure, RepeatModeler can recover from it and continue from where it
+name (3 tabs for contig name, length and some other detail) removed because this info created problems downstream.    
+**Note:** if there is an unexpected system failure, RepeatModeler can recover from it and continue from where it
 previously left off. See the README file in its program directory.  
 
 The next step is to copy all the consensi.fa.classified libraries to a directory and combine them, then separate 
-fasta entries with known and unknown repeats.  
+fasta entries with known and unknown repeats.    
 **Setting things up:**
 ```{r}
 speciesRepeatDBname <- "spp_Lach_repeatDB"
@@ -184,7 +184,7 @@ write(cmd, file = paste(allSppRepeatDBpath, repModAllsppFileName, sep = ""))
 ```
 
 **Split unknown and known repeats to separate files:** 
-We'll use perl scripts for this (in ~/prog/scripts_pl/): _selectFasta_byIDUnknown.pl_, _selectFasta_byID_Known.pl_  
+We'll use perl scripts for this (in ~/prog/scripts_pl/): _selectFasta_byIDUnknown.pl_, _selectFasta_byID_Known.pl_    
 **Note:** You need to open these perl scripts and edit them to fix the names you want for input and output,
 and you need to run them in the directory where your input is.
 ```{r}
@@ -211,19 +211,19 @@ with 22 processors, so thread using 21):
 
 To look at the output, search for "Sequences producing significant alignments".  
 
-**Blastn vs RNA database for ribosomal or other RNA genes:**
+**Blastn vs RNA database for ribosomal or other RNA genes:**  
 Blastn vs RNA database for ribosomal or other RNA genes. Rfam.fasta comes with the Rfam download and it requires you to
 download the Rfam database. Do this only when it hasn't already been done, or if it's been a really
-long time and you need to update the database:  
-**_$ cd ~/prog/_**
-**_$ mkdir rfam_**
-**_$ cd rfam_**
-**_$ wget -r_ ftp://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/fasta_files/**
-**_$ mv -f_ ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/fasta_files/* .**
-**_$ gunzip RF0*_**
-**_$ cat *.fa > rfam.fasta_**
-**_$ mv RF*_ ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/fasta_files/**
-**_$ makeblastdb -in rfam.fasta -dbtype nucl_**  
+long time and you need to update the database:    
+**_$ cd ~/prog/_**  
+**_$ mkdir rfam_**  
+**_$ cd rfam_**  
+**_$ wget -r_ ftp://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/fasta_files/**  
+**_$ mv -f_ ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/fasta_files/* .**  
+**_$ gunzip RF0*_**  
+**_$ cat *.fa > rfam.fasta_**  
+**_$ mv RF*_ ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/fasta_files/**  
+**_$ makeblastdb -in rfam.fasta -dbtype nucl_**    
 
 **Run Blastn against the rfam database in the Lachnellula_species/RepeatDatabases/spp_Lach_repeatDB dir:**
 ```{r}
@@ -243,7 +243,7 @@ those repeats with good hits, and documented this in the file
 The final unknown file is called "unknown_Lachnellula_consensi.fa.nr.rna.checked.blast.classified" and the known repeat library file
 is called "known_Lachnellula_consensi.fa.classified".
 
-**Convert the EMBL repeat library from RepeatMasker to fasta format:**
+**Convert the EMBL repeat library from RepeatMasker to fasta format:**  
 Place the repeat library in its own dir in the Lachnellula_species dir:
 ```{r}
 dir.create(paste(projRepeatDB, "embl_RepeatMaskerDB", sep = ""), showWarnings = TRUE, recursive = FALSE)
