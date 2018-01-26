@@ -482,7 +482,7 @@ The fix was to remove the directory in _**~/perl5/lib/perl5/x86_64-linux-thread-
 placing it in my home directory (or if you want you can just delete it too):  
   
 **_$ cd ~/perl5/lib/perl5/_**  
-_**$ mv -f x86_64-linux-thread-multi ~**_  
+**_$ mv -f x86_64-linux-thread-multi_** **~**  
   
 See: https://www.reddit.com/r/openbsd/comments/65efvo/openbsd_61_perl_problem_undefined_symbol_perl_xs/  
   
@@ -782,7 +782,7 @@ RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
 #### B. Training Augustus using BUSCO.  
-__**Augustus**  __
+**__Augustus__**  
 Training Augustus is a more laborious process. Luckily, the recent release of BUSCO provides a nice pipeline 
 for performing the training, while giving you an idea of how good your annotation already is (If you don't want 
 to go this route, there are scripts provided with Augustus to perform the training). First, the Parallel::ForkManager 
