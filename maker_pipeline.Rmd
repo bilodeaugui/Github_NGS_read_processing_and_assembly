@@ -104,7 +104,7 @@ from Repbase or from internal efforts are great, but it is also important to ide
 genome using RepeatModeler. This is pretty easy to do and normally only takes a couple days using 8-12 cores.  
 Why do this? 
 If we were working with a well-studied organism, we wouldn't need to, we could just stick to the database that repeatmasker 
-used which we updated with RepBase. But our species are not well-studied  Lachnellula, and so we need to create 
+used which we updated with RepBase. But our species are not well-studied *Lachnellula*, and so we need to create 
 a species-specific repeat library for each of our species.  
 
 #### A. Setting up directories.
@@ -177,7 +177,7 @@ suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 metadataAssemblies$repModelerConsensi <- paste(metadataAssemblies$SppAbbrv, "_consensi.fa.classified", sep = "")
 list   <- metadataAssemblies$repModelerConsensi
 output <- paste(list, collapse = " ")
-# I'm automating the output file name, since all the species in this set (Lachnellula spp), are within the same
+# I'm automating the output file name, since all the species in this set (*Lachnellula spp*), are within the same
 # genus, but if this is not the case for another set, specify the output file name manually.
 species <- c(metadataAssemblies$ScientificName)
 genus   <- gsub("_.*", "", species)
@@ -262,20 +262,24 @@ cmd    <- paste("perl /home/CFIA-ACIA/girouxeml/prog/RepeatMasker/util/buildRMLi
                 " ", paste(allSppRepeatDBpath, "Unknown_", infile, sep = ""),
                 sep = "")
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
-# RepeatMaskerLib.fasta
 ```
 
 Further steps can be taken to annotate the resulting library, but the most important reason for this 
 library is for downstream gene prediction. This step came from an example where a Boa library was 
-combined with several other snakes and annotated.
-
-2. Full Repeat Annotation
+combined with several other snakes and annotated:  
+  
+https://gist.github.com/darencard/bb1001ac1532dd4225b030cf0cd61ce2  
+  
+#### D. Full Repeat Annotation with RepeatMasker:   
+  
+**__Full Repeat Annotation:__**  
 Depending on the species, the de novo library can be fed right into MAKER, however, based on the very thorough example provided 
 by https://gist.github.com/darencard/bb1001ac1532dd4225b030cf0cd61ce2, we'll be doing a more complex repeat identification.
+  
+__**EMBL repeat library masking:**__  
 First, we mask using a currated library to overcome a previously-identified issue with the Repbase annotation. 
 I used the known library from repeatmasker.lib.EMBL, which I converted to fasta format using RepeatMasker/util/buildRMLibFromEMBL.pl script.
-
-Pass the Lsue assembly through the RepeatMaskerLib.fasta with RepeatMasker:
+Then we pass the species genome assemblies through the RepeatMaskerLib.fasta using RepeatMasker.
 ```{r}
 for(i in 1:length(metadataAssemblies$RepeatDBPath)){
     dir.create(paste(metadataAssemblies$RepeatDBPath[i], "embl_mask", sep = ""), showWarnings = TRUE, recursive = FALSE)
@@ -291,10 +295,11 @@ cmd    <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```
 
+__**Known repeat library masking:**__  
 Then the masked FASTA from this search can be used as input for the next search. I also normally 
 rename the outputs after each round so they are more representative of what they contain. Do 2 rounds, 
-using the known and unknown Lachnellula repeat libraries created, split, so that the known elements 
-would be preferentially annotated over unknown, to the degree possible.
+using the known and unknown *Lachnellula* repeat libraries created, split, so that the known elements 
+would be preferentially annotated over unknown, to the degree possible.  
 ```{r}
 for(i in 1:length(metadataAssemblies$RepeatDBPath)){
     dir.create(paste(metadataAssemblies$RepeatDBPath[i], "Known_Mask", sep = ""), showWarnings = TRUE, recursive = FALSE)
@@ -311,6 +316,7 @@ cmd    <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```
 
+__**Unknown repeat library masking:**__  
 Run RepeatMasker with unknown repeat lib, using as input the unknown masked output. Note, make sure to use the unknown lib
 that was passed through NR, RNA, and BLAST checks to remove repeats that were actually part of genes or functional RNAs.
 ```{r}
@@ -330,7 +336,7 @@ suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 # Ignore the segmentation fault errors, these are tries over already masked strings
 ```
 
-Finally, results from each round must be analyzed together to produce the final repeat annotation:
+**Finally, results from each round must be analyzed together to produce the final repeat annotation:**
 ```{r}
 # Make a directory in each species dir for the repeats masked with the embl lib:
 for(i in 1:length(metadataAssemblies$RepeatDBPath)){
@@ -352,7 +358,7 @@ cmd2    <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 ```
 
-Gunzip and then cat repeat outputs:
+**Gunzip and then cat repeat outputs:**
 ```{r}
 prefix <- "gunzipToCatRepeatFasta"
 cmd    <- with(metadataAssemblies, 
@@ -364,7 +370,7 @@ cmd    <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
-Make a directory in each species dir for the final repeats masked:
+**Make a directory in each species dir for the final repeats masked:**
 ```{r}
 for(i in 1:length(metadataAssemblies$RepeatDBPath)){
     dir.create(paste(metadataAssemblies$RepeatDBPath[i], "Final_mask", sep = ""), showWarnings = TRUE, recursive = FALSE)
@@ -381,7 +387,7 @@ cmd    <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
-Process the repeats:
+**Process the repeats:**
 ```{r}
 prefix <- "processRepeats"
 cmd    <- with(metadataAssemblies, paste(processRepeatsPath, " -species fungi ", 
@@ -390,8 +396,9 @@ cmd    <- with(metadataAssemblies, paste(processRepeatsPath, " -species fungi ",
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
-Finally, in order to feed these repeats into MAKER properly, we must separate out the complex repeats (more info on this below).
-Create GFF3:
+Finally, in order to feed these repeats into MAKER properly, we must separate out the complex repeats (more info on this below).  
+  
+**Create GFF3:**
 ```{r}
 prefix <- "rmOutToGFF3"
 cmd <- with(metadataAssemblies, 
@@ -401,7 +408,7 @@ cmd <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
-Isolate complex repeats:
+**Isolate complex repeats:**
 ```{r}
 prefix <- "isolate_complex_Repeats"
 cmd <- with(metadataAssemblies, 
@@ -413,8 +420,11 @@ cmd <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
-Reformat to work with MAKER - I can't seem to be able to generate the commands I want for this one.
-The commands are below the chunk - passed them on the terminal in each directory manually.
+__**Reformat to work with MAKER:**__   
+  
+**Note:**  
+I can't seem to be able to generate the commands I want for this one. The commands are in the chunk below, and 
+I passed them on the terminal in each directory manually.
 ```{r}
 cmd <- with(metadataAssemblies,
             paste("cat ", paste(RepeatDBPath, "Full_mask/", SppAbbrv, ".assembly.full_mask.complex.gff3 ", sep = ""),
@@ -428,29 +438,29 @@ cmd <- with(metadataAssemblies,
 #  perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \
 #  > Full_mask/Lsue.assembly.full_mask.complex.reformat.gff3
 ```
-cat Lari.assembly.full_mask.complex.gff3 | \
-perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \
-> Lari.assembly.full_mask.complex.reformat.gff3
-
-cat Lcer.assembly.full_mask.complex.gff3 |\
-perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \
-> Lcer.assembly.full_mask.complex.reformat.gff3
-
-cat Lhya.assembly.full_mask.complex.gff3 |\
-perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \
-> Lhya.assembly.full_mask.complex.reformat.gff3
-
-cat Locc.assembly.full_mask.complex.gff3 |\
-perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \
-> Locc.assembly.full_mask.complex.reformat.gff3
-
-cat Lsub.assembly.full_mask.complex.gff3 |\
-perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \
-> Lsub.assembly.full_mask.complex.reformat.gff3
-
-cat Lawi.assembly.full_mask.complex.gff3 |\
-perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \
-> Lawi.assembly.full_mask.complex.reformat.gff3
+cat Lari.assembly.full_mask.complex.gff3 |\\  
+perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \  
+\> Lari.assembly.full_mask.complex.reformat.gff3  
+  
+cat Lcer.assembly.full_mask.complex.gff3 |\\  
+perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \  
+\> Lcer.assembly.full_mask.complex.reformat.gff3  
+  
+cat Lhya.assembly.full_mask.complex.gff3 |\\  
+perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \  
+\> Lhya.assembly.full_mask.complex.reformat.gff3  
+  
+cat Locc.assembly.full_mask.complex.gff3 |\\  
+perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \  
+\> Locc.assembly.full_mask.complex.reformat.gff3  
+  
+cat Lsub.assembly.full_mask.complex.gff3 |\\  
+perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \  
+\> Lsub.assembly.full_mask.complex.reformat.gff3  
+  
+cat Lawi.assembly.full_mask.complex.gff3 |\\  
+perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \  
+\> Lawi.assembly.full_mask.complex.reformat.gff3  
 
 
 Now we have the prerequisite data for running MAKER. Add this to the data table:
