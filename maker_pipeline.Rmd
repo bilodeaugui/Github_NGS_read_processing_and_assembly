@@ -482,7 +482,7 @@ The fix was to remove the directory in _**~/perl5/lib/perl5/x86_64-linux-thread-
 placing it in my home directory (or if you want you can just delete it too):  
   
 **_$ cd ~/perl5/lib/perl5/_**  
-**_$ mv -f x86_64-linux-thread-multi ~_**  
+_**$ mv -f x86_64-linux-thread-multi ~**_  
   
 See: https://www.reddit.com/r/openbsd/comments/65efvo/openbsd_61_perl_problem_undefined_symbol_perl_xs/  
   
@@ -510,7 +510,7 @@ suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
-**Rename the output file to include the organism name:**
+#### C. Rename the output file to include the organism name:
 ```{r}
 cmd <- with(metadataAssemblies,
             paste("cd ", genemarkEsRnd1Path, " && ",
@@ -643,19 +643,24 @@ suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd3, prefix3, suffix)
 RemoveQsubTempFiles(sharedPathAn, prefix); RemoveQsubTempFiles(sharedPathAn, prefix2); RemoveQsubTempFiles(sharedPathAn, prefix3)
 ```
 
-4. Training Gene Prediction Software
+### 4. Training Gene Prediction Software SNAP and Augustus.  
 Besides mapping the empirical transcript and protein evidence to the reference genome and repeat annotation 
 (not much of this in our example, given we've done so much up front), the most important product of this MAKER 
-run is the gene models. These are what is used for training gene prediction software like augustus and snap.
-SNAP: SNAP is pretty quick and easy to train. Issuing the following commands will perform the training. It's best 
+run is the gene models. These are used for training gene prediction software like augustus and snap.  
+  
+#### A. Training SNAP.  
+SNAP is pretty quick and easy to train. Issuing the following commands will perform the training. It's best 
 to put some thought into what kind of gene models you use from MAKER. Ideally we would like to have sufficient 
 evidence to filter to use models with an AED of 0.25 or better and a length of 50 or more amino acids 
 (maker2zff -x 0.25 -l 50), which helps get rid of junky models, but we do not have enough evidence to support this 
 for our data (no EST or transcript data for our specific organism), and it will result in nothing being returned. 
 But we can specify all filter parameters so that at least we can filter based on AED and length, and set all other options
-dependent on EST evidence to 0, which is still better than setting it to no filters (-n).
-
-Export 'confident' gene models from MAKER and rename to something meaningful
+dependant on EST evidence to 0, which is still better than setting it to no filters (-n).  
+  
+We start with exporting 'confident' gene models from round 1 of MAKER for use in retraining SNAP. We'll generate some summary stats
+of the models, and then collecting the training sequences and generating training parameters for BUSCO to train Augustus.  
+  
+**Export confident gene models from round 1 of MAKER using maker2zff:**  
 For determining which genes are High Confidence for Retraining:
 ```{r}
 for(k in 1:nrow(metadataAssemblies)){
@@ -673,12 +678,12 @@ cmd <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
-To remove the output files after you are done:
+**To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
-Take a quick look at number of seqs in genome.dna file
+**Take a quick look at number of seqs in genome.dna file:**
 ```{r}
 cmd <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd1Path, " && ", 'grep ">" genome.dna | wc -l ', sep = ""))
 sapply(cmd, function(x) system(x))
@@ -692,7 +697,7 @@ cmd <- with(metadataAssemblies, file.rename(paste(snapRnd1MakerRnd1Path, "genome
 sapply(cmd, function(x) system(x))
 ```
 
-Gather some stats and validate:
+**Gather some stats and validate using fathom:**
 ```{r}
 prefix <- "fathom_MakerRnd1_stats"
 cmd <- with(metadataAssemblies,
@@ -711,12 +716,12 @@ cmd2 <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 ```
 
-To remove the output files after you are done:
+**To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix); RemoveQsubTempFiles(sharedPathAn, prefix2)
 ```
 
-Collect the training sequences and annotations, plus 1000 surrounding bp for training
+**Collect the training sequences and annotations, plus 1000 surrounding bp for training using fathom:**
 ```{r}
 prefix <- "fathom_MakerRnd1_categorize"
 cmd <- with(metadataAssemblies,
@@ -737,12 +742,12 @@ cmd2 <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 ```
 
-To remove the output files after you are done:
+**To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix); RemoveQsubTempFiles(sharedPathAn, prefix2)
 ```
 
-Create the training parameters:
+**Create the training parameters:**
 ```{r}
 for(k in 1:nrow(metadataAssemblies)){
     dir.create(paste(metadataAssemblies$snapMakerRnd1Path[k], "round1/params", sep = ""),
@@ -756,12 +761,12 @@ cmd <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
-To remove the output files after you are done:
+**To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
-Assemble the HMM:
+**Assemble the HMM:**
 ```{r}
 prefix <- "hmmAssembler_MakerRnd1"
 cmd <- with(metadataAssemblies,
@@ -771,24 +776,26 @@ cmd <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
-To remove the output files after you are done:
+**To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
-Augustus
-Training Augustus is a more laborious process. Luckily, the recent release of BUSCO provides 
-a nice pipeline for performing the training, while giving you an idea of how good your annotation 
-already is (If you don't want to go this route, there are scripts provided with Augustus to 
-perform the training). First, the Parallel::ForkManager module for Perl is required to run BUSCO 
-with more than one core. You can easily install it before the first time you use BUSCO by running 
-sudo apt-get install libparallel-forkmanager-perl.
-cpanm Parallel::ForkManager
-
-This probably isn't an ideal training environment, but appears to work well. First, we must put 
-together training sequences using the gene models we created in our first run
-of MAKER. We do this by issuing the following command to excise the regions that contain mRNA 
-annotations based on our initial MAKER run (with 1000bp on each side).
+#### B. Training Augustus using BUSCO.  
+__**Augustus**  __
+Training Augustus is a more laborious process. Luckily, the recent release of BUSCO provides a nice pipeline 
+for performing the training, while giving you an idea of how good your annotation already is (If you don't want 
+to go this route, there are scripts provided with Augustus to perform the training). First, the Parallel::ForkManager 
+module for Perl is required to run BUSCO with more than one core. You can easily install it before the first time 
+you use BUSCO by running:   
+  
+_**$ sudo apt-get install libparallel-forkmanager-perl**_  
+_**$ cpanm Parallel::ForkManager**_  
+  
+**Excise regions with mRNA annotations from MAKER round 1**    
+This probably isn't an ideal training environment, but appears to work well. First, we must put together training 
+sequences using the gene models we created in our first run of MAKER. We do this by issuing the following command 
+to excise the regions that contain mRNA annotations based on our initial MAKER run (with 1000bp on each side).
 ```{r}
 prefix <- "maker-augustus_get_mRNA_regions_Rnd1"
 cmd <- with(metadataAssemblies,
@@ -805,39 +812,36 @@ cmd[1]
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
-To remove the output files after you are done:
+**To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
-There are some important things to note based on this approach. First is that you will likely 
-get warnings from BEDtools that certain coordinates could not be used to extract FASTA sequences. 
-This is because the end coordinate of a transcript plus 1000 bp is beyond the total length of a 
-given scaffold. This script does account for transcripts being within the beginning 1000bp of the 
-scaffold, but there was no easy way to do the same with transcripts within the last 1000bp of the 
-scaffold. This is okay, however, as we still end up with sequences from thousands of gene models and 
-BUSCO will only be searching for a small subset of genes itself.
-While we've only provided sequences from regions likely to contain genes, we've totally eliminated 
-any existing annotation data about the starts/stops of gene elements. Augustus would normally use 
-this as part of the training process. However, BUSCO will essentially do a reannotation of these 
-regions using BLAST and built-in HMMs for a set of conserved genes (hundreds to thousands). This has 
-the effect of recreating some version of our gene models for these conserved genes. We then leverage 
-the internal training that BUSCO can perform (the --long argument) to optimize the HMM search model to 
-train Augustus and produce a trained HMM for MAKER. Here is the command we use to perform the Augustus 
-training inside BUSCO.
-
-In this case, we are using the Pezizomycotina set of conserved genes (N = 3156 genes), so BUSCO 
-will try to identify those genes using BLAST and an initial HMM model for each that comes stocked 
-within the BUSCO database. We specify the -m genome option since we are giving BUSCO regions that 
-include more than just transcripts. The initial HMM model we'll use is the Botrytis cinerea one 
-(-sp botrytis_cinerea), which is a reasonably close species (the closest we'll get). Finally, the --long 
-option tells BUSCO to use the initial gene models it creates to optimize the HMM settings of the raw 
-human HMM, thus training it for our use on Lsue. We can have this run in parallel on several cores, 
-but it will still likely take days, so be patient. Note, some of the options are kept in the config.ini 
-file in the busco/config/ directory. Also, if during the run it keeps crashing with segmentation fault, core
-dumped, it may be an error with the threading. Try running on just one core. May take a lot longer though,
-but at least it's still moving along.
-*** Over here - got to this point for the assembly of Lawi (Lawi2) that is a hybrid of IonT and MiSeq data from Marco - 25Jan2018
+There are some important things to note based on this approach. First is that you will likely get warnings from 
+BEDtools that certain coordinates could not be used to extract FASTA sequences. This is because the end coordinate 
+of a transcript plus 1000 bp is beyond the total length of a given scaffold. This script does account for transcripts 
+being within the beginning 1000bp of the scaffold, but there was no easy way to do the same with transcripts within 
+the last 1000bp of the scaffold. This is okay, however, as we still end up with sequences from thousands of gene models 
+and BUSCO will only be searching for a small subset of genes itself.  
+  
+While we've only provided sequences from regions likely to contain genes, we've totally eliminated any existing annotation 
+data about the starts/stops of gene elements. Augustus would normally use this as part of the training process. However, 
+BUSCO will essentially do a reannotation of these regions using BLAST and built-in HMMs for a set of conserved genes 
+(hundreds to thousands). This has the effect of recreating some version of our gene models for these conserved genes. We 
+then leverage the internal training that BUSCO can perform (the --long argument) to optimize the HMM search model to train 
+Augustus and produce a trained HMM for MAKER. Here is the command we use to perform the Augustus training inside BUSCO.  
+  
+In this case, we are using the Pezizomycotina set of conserved genes (N = 3156 genes), so BUSCO will try to identify those 
+genes using BLAST and an initial HMM model for each that comes stocked within the BUSCO database. We specify the -m genome 
+option since we are giving BUSCO regions that include more than just transcripts. The initial HMM model we'll use is the 
+*Botrytis cinerea* one (-sp botrytis_cinerea), which is a reasonably close species (the closest we'll get). Finally, the --long 
+option tells BUSCO to use the initial gene models it creates to optimize the HMM settings of the raw human HMM, thus training 
+it for our use on Lsue. We can have this run in parallel on several cores, but it will still likely take days, so be patient. 
+Note, some of the options are kept in the config.ini file in the busco/config/ directory. Also, if during the run it keeps 
+crashing with segmentation fault, core dumped, it may be an error with the threading. Try running on just one core. It may 
+take a lot longer though, but at least it's still moving along.  
+*** Over here - got to this point for the assembly of Lawi (Lawi2) that is a hybrid of IonT and MiSeq data from Marco - 25Jan2018  
+**Run BUSCO:**
 ```{r}
 prefix <- "Busco_MakerRnd1"
 node <- 8
@@ -855,7 +859,7 @@ suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 # config.ini file in ~/prog/busco/config/ to make sure that restart is set to True, and that you adjust to the correct cpus number.
 ```
 
-To remove the output files after you are done:
+**To remove the output files after you are done:**
 ```{r}
 # system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
 RemoveQsubTempFiles(sharedPathAn, prefix)
@@ -868,7 +872,9 @@ sapply(cmd, function(x) system(x))
 Once BUSCO is complete, it will give you an idea of how complete your annotation is (though be cautious, 
 because we haven't filtered away known alternative transcripts that will be binned as duplicates). We need 
 to do some post-processing of the HMM models to get them ready for MAKER. First, we'll rename the files within
-/maker_round_1/snap/round1/run_Lsue_rnd1_maker/augustus_output/retraining_parameters.
+/maker_round_1/snap/round1/run_Lsue_rnd1_maker/augustus_output/retraining_parameters. 
+  
+**Rename output files from the BUSCO run:**
 ```{r}
 metadataAssemblies$BuscoOut <- paste(metadataAssemblies$snapRnd1MakerRnd1Path, "run_", metadataAssemblies$SppAbbrv, "_rnd1_maker/", sep = "")
 metadataAssemblies$BuscoRetrainParam <- paste(metadataAssemblies$BuscoOut, "augustus_output/retraining_parameters/", sep = "")
@@ -885,6 +891,7 @@ fl <- list.files(metadataAssemblies$BuscoRetrainParam, full.names = TRUE)
 # ~/perl5/bin/rename 's/BUSCO_Lawi_rnd1_maker_4015572171/Lachnellula_willkommii/g' *
 ```
 
+**Rename the files cited within the output files from the BUSCO run:**  
 We also need to rename the files cited within certain HMM configuration files:
 ```{r}
 # sed -i 's/BUSCO_Lari_rnd1_maker_1793275218/Lachnellula_arida/g' Lachnellula_arida_parameters.cfg
@@ -896,11 +903,12 @@ We also need to rename the files cited within certain HMM configuration files:
 # sed -i 's/BUSCO_Lawi_rnd1_maker_4015572171/Lachnellula_willkommii/g' Lachnellula_willkommii_parameters.cfg
 ```
 
+**Add the newly-trained Augustus retraining parameter files to the Augustus species library directory:**  
 Finally, we must copy these into the $AUGUSTUS_CONFIG_PATH species HMM location so they are accessible 
 by Augustus and MAKER. I had put the $AUGUSTUS_CONFIG_PATH in the .bash_profile, after copying the 
 directory from the isilon MAKER pipeline, for MAKER version 2.10. This is because I do not have 
-write access to the isilon directory, but I do have it for my local directory.
-
+write access to the isilon directory, but I do have it for my local directory.  
+  
 Do this from within the dir /maker_round_1/snap/round1/run_Lsue_rnd1_maker/augustus_output/retraining_parameters/
 ```{r}
 for(k in 1:nrow(metadataAssemblies)){
