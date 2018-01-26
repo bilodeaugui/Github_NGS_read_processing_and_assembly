@@ -108,7 +108,7 @@ used which we updated with RepBase. But our species are not well-studied *Lachne
 a species-specific repeat library for each of our species.  
 
 #### A. Setting up directories.
-**Make a directory within each species-specific directory that will contain all Repeat and Maker annotation data:**
+**Make a directory within each species-specific directory that will contain all Repeat and MAKER annotation data:**
 ```{r}
 for(k in 1:nrow(metadataAssemblies)){
     dir.create(paste(sharedPathAn, metadataAssemblies$ScientificName[i], "/", 
@@ -470,9 +470,9 @@ metadataAssemblies$makerFullMaskGFF3 <- paste(metadataAssemblies$RepeatDBPath, "
 ```
 
 ### 2. Annotation using Genemark-ES.  
-Before we run Maker, we can run Genemark-es, which requires no other input but the genome assemblies. This is supposed to be especially 
-useful for fungal genomes. Once this is running, you can continue on with the chunk that gets the initial run of Maker going, since it doesn't
-depend on the genemark-es outputs for the first round of Maker.  
+Before we run MAKER, we can run Genemark-es, which requires no other input but the genome assemblies. This is supposed to be especially 
+useful for fungal genomes. Once this is running, you can continue on with the chunk that gets the initial run of MAKER going, since it doesn't
+depend on the genemark-es outputs for the first round of MAKER.  
 It's a bit tricky to install the genemark-es due to dependencies, but works by installing one at a time all
 dependencies using **cpanm**. Also, there was an error when trying to run it at first:  
   
@@ -482,7 +482,7 @@ The fix was to remove the directory in _**~/perl5/lib/perl5/x86_64-linux-thread-
 placing it in my home directory (or if you want you can just delete it too):  
   
 **_$ cd ~/perl5/lib/perl5/_**  
-**_$ mv -f x86_64-linux-thread-multi ~ _**  
+**_$ mv -f x86_64-linux-thread-multi ~_**  
   
 See: https://www.reddit.com/r/openbsd/comments/65efvo/openbsd_61_perl_problem_undefined_symbol_perl_xs/  
   
@@ -518,7 +518,7 @@ cmd <- with(metadataAssemblies,
 sapply(cmd, function(x) system(x))
 ```
 
-### 3. Maker Round 1: Initial MAKER Analysis.  
+### 3. MAKER Round 1: Initial MAKER Analysis.  
 MAKER is pretty easy to get going and relies on properly completed control files. In this first round, we will be
 providing the data files for the repeat annotation (rm_gff), the transcriptome assembly (est), and extra protein files from
 related species, which we have retrieved and saved in our References directory. We will also set the model_org to 'simple' 
@@ -530,7 +530,7 @@ for(i in 1:length(metadataAssemblies$RepeatDBPath)){
 metadataAssemblies$maker_rnd1_path <- paste(metadataAssemblies$RepeatDBPath, "maker_round_1/", sep = "")
 ```
 
-**Generate the maker control files:**
+#### A. Generate the MAKER control files.
 ```{r}
 prefix <- "maker_rnd1_CTL"
 cmd <- with(metadataAssemblies, paste("cd ", maker_rnd1_path, " && ", makerPath, " -CTL ", sep = ""))
@@ -540,7 +540,8 @@ metadataAssemblies$makerRnd1_CTL_optsPath <- paste(metadataAssemblies$maker_rnd1
 metadataAssemblies$makerRnd1_CTL_exePath  <- paste(metadataAssemblies$maker_rnd1_path, "maker_exe.ctl", sep = "")
 ```
 
-**The command below will edit the altest, altest_gff, model_org, augustus_species, est2genome, protein2genome, and min_contig:**
+#### B. Edit the MAKER control files.  
+**The commands below will edit the altest, altest_gff, model_org, augustus_species, est2genome, protein2genome, and min_contig:**
 ```{r}
 cmd <- with(metadataAssemblies,
             paste("/opt/rocks/bin/replace",
@@ -583,7 +584,7 @@ for(i in 1:nrow(metadataAssemblies)){
     makerOptsGenRepl(metadataAssemblies$makerRnd1_CTL_optsPath[i], pattern, newPattern[i])}
 ```
 
-**Run MAKER**  
+#### C. Run MAKER.  
 Given MAKER will be using BLAST to align transcripts and proteins to the genome, this will take at 
 least a couple days with 12 cores. Speed is a product of the resources you allow (more cores == faster) 
 and the assembly quality (smaller, less contiguous scaffolds == longer).
@@ -602,12 +603,12 @@ cmd <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```
 
-To remove the output files after you are done:
+**To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
-We conclude by assembling together the GFF and FASTA outputs.
+#### D. Assemble the MAKER GFF and FASTA outputs.
 ```{r}
 metadataAssemblies$makerRnd1_OutputPath <- paste(metadataAssemblies$maker_rnd1_path, metadataAssemblies$SppAbbrv, "_rnd1.maker.output/", sep = "")
 
@@ -637,7 +638,7 @@ cmd3 <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd3, prefix3, suffix)
 ```
 
-To remove the output files after you are done:
+**To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix); RemoveQsubTempFiles(sharedPathAn, prefix2); RemoveQsubTempFiles(sharedPathAn, prefix3)
 ```
@@ -897,7 +898,7 @@ We also need to rename the files cited within certain HMM configuration files:
 
 Finally, we must copy these into the $AUGUSTUS_CONFIG_PATH species HMM location so they are accessible 
 by Augustus and MAKER. I had put the $AUGUSTUS_CONFIG_PATH in the .bash_profile, after copying the 
-directory from the isilon maker pipeline, for maker version 2.10. This is because I do not have 
+directory from the isilon MAKER pipeline, for MAKER version 2.10. This is because I do not have 
 write access to the isilon directory, but I do have it for my local directory.
 
 Do this from within the dir /maker_round_1/snap/round1/run_Lsue_rnd1_maker/augustus_output/retraining_parameters/
@@ -967,7 +968,7 @@ To remove the output files after you are done:
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
-Now go up to the RepeatDB dir, and create a dir for the next round of maker:
+Now go up to the RepeatDB dir, and create a dir for the next round of MAKER:
 ```{r}
 for(k in 1:nrow(metadataAssemblies)){
     dir.create(paste(metadataAssemblies$RepeatDBPath[k], "maker_round_2", sep = ""), 
@@ -975,7 +976,7 @@ for(k in 1:nrow(metadataAssemblies)){
 metadataAssemblies$maker_rnd2_path <- paste(metadataAssemblies$RepeatDBPath, "maker_round_2/", sep = "")
 ```
 
-Generate the maker control files for the second round of maker:
+Generate the MAKER control files for the second round of MAKER:
 ```{r}
 prefix <- "maker_rnd2_CTL"
 cmd <- with(metadataAssemblies, paste("cd ", maker_rnd2_path, " && ", makerPath, " -CTL ", sep = ""))
@@ -1261,7 +1262,7 @@ cmd <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && rm core
 sapply(cmd, function(x) system(x))
 ```
 
-Post-processing of BUSCO HMM models to get them ready for Maker.
+Post-processing of BUSCO HMM models to get them ready for MAKER.
 First rename the files within the augustus_output/retraining_parameters dir:
 ```{r}
 metadataAssemblies$BuscoOut_Rnd2 <- paste(metadataAssemblies$snapRnd1MakerRnd2Path, "run_", metadataAssemblies$SppAbbrv, "_rnd2_maker/", sep = "")
@@ -1292,7 +1293,7 @@ We also need to rename the files cited within certain HMM configuration files:
 
 Finally, we must copy these into the $AUGUSTUS_CONFIG_PATH species HMM location so they are accessible 
 by Augustus and MAKER. I had put the $AUGUSTUS_CONFIG_PATH in the .bash_profile, after copying the 
-directory from the isilon maker pipeline, for maker version 2.10. This is because I do not have 
+directory from the isilon MAKER pipeline, for MAKER version 2.10. This is because I do not have 
 write access to the isilon directory, but I do have it for my local directory.
 
 Do this from within the dir /maker_round_1/snap/round1/run_Lsue_rnd1_maker/augustus_output/retraining_parameters/
@@ -1308,7 +1309,7 @@ cmd <- with(metadataAssemblies,
 sapply(cmd, function(x) system(x))
 ```
 
-# We've now completed the 2nd round of Maker, and run a second Augustus training session using BUSCO. 
+# We've now completed the 2nd round of MAKER, and run a second Augustus training session using BUSCO. 
 # We can see how things are going by evaluating the gene models we have so far:
 A. Count the number of gene models and the gene lengths:
 I manually recorded the output values to a summary BUSCO excel file. Welcome to ideas on how to capture the output.
@@ -1376,7 +1377,7 @@ of ab initio software training and MAKER annotation (i.e., 3 rounds total) and r
 thereafter. One needs to be careful not to overtrain Augustus and SNAP, so more rounds isn't necessarily always better. 
 Keep evaluating your gene models after successive rounds of MAKER to identify when you have sound models.
 
-## Running round 3 of Maker:
+## Running round 3 of MAKER:
 
 
 
