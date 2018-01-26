@@ -65,7 +65,8 @@ rmOutToGFF3Path <- "/home/CFIA-ACIA/girouxeml/prog/RepeatMasker/util/rmOutToGFF3
 
 **Define paths to reference files used:**  
 **Note,** require entire proteome from a  min of two related species and perhaps all of UniProt/SwissProt. 
-See advice for multiple proteomes for homology: https://groups.google.com/forum/#!topic/maker-devel/jbBm_4ycFU8  
+See advice for multiple proteomes for homology: https://groups.google.com/forum/#!topic/maker-devel/jbBm_4ycFU8
+  
 **_Marsonnina brunnea_** available at: https://www.ncbi.nlm.nih.gov/genome/?term=txid698440[orgn]:
 ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/298/775/GCA_000298775.1_ASM29877v1  
   
@@ -225,10 +226,10 @@ long time and you need to update the database:
 **_$ mkdir rfam_**  
 **_$ cd rfam_**  
 **_$ wget -r_ ftp://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/fasta_files/**  
-**_$ mv -f_** **ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/fasta_files/* .**  
+**_$ mv -f_ ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/fasta_files/\* .**  
 **_$ gunzip RF0\*_**  
 **_$ cat *.fa > rfam.fasta_**  
-**_$ mv RF*_** **ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/fasta_files/**  
+**_$ mv RF\*_ ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/fasta_files/**  
 **_$ makeblastdb -in rfam.fasta -dbtype nucl_**    
 
 **Run Blastn against the rfam database in the Lachnellula_species/RepeatDatabases/spp_Lach_repeatDB dir:**
