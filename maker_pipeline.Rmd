@@ -98,7 +98,7 @@ metadataAssemblies <- fread(paste(sharedPathAn, "Lachnellula_genomes_MetadataAss
 metadataAssemblies[, V1:=NULL]
 ```
 
-### 1. De novo Repeat Identification.
+### 1. De novo Repeat Identification.  
 The first, and very important, step to genome annotation is identifying repetitive content. Existing libraries 
 from Repbase or from internal efforts are great, but it is also important to identify repeats de novo from your reference 
 genome using RepeatModeler. This is pretty easy to do and normally only takes a couple days using 8-12 cores.  
@@ -438,27 +438,27 @@ cmd <- with(metadataAssemblies,
 #  perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \
 #  > Full_mask/Lsue.assembly.full_mask.complex.reformat.gff3
 ```
-cat Lari.assembly.full_mask.complex.gff3 |\\  
+cat Lari.assembly.full_mask.complex.gff3 | \\  
 perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \  
 \> Lari.assembly.full_mask.complex.reformat.gff3  
   
-cat Lcer.assembly.full_mask.complex.gff3 |\\  
+cat Lcer.assembly.full_mask.complex.gff3 | \\  
 perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \  
 \> Lcer.assembly.full_mask.complex.reformat.gff3  
   
-cat Lhya.assembly.full_mask.complex.gff3 |\\  
+cat Lhya.assembly.full_mask.complex.gff3 | \\  
 perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \  
 \> Lhya.assembly.full_mask.complex.reformat.gff3  
   
-cat Locc.assembly.full_mask.complex.gff3 |\\  
+cat Locc.assembly.full_mask.complex.gff3 | \\  
 perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \  
 \> Locc.assembly.full_mask.complex.reformat.gff3  
   
-cat Lsub.assembly.full_mask.complex.gff3 |\\  
+cat Lsub.assembly.full_mask.complex.gff3 | \\  
 perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \  
 \> Lsub.assembly.full_mask.complex.reformat.gff3  
   
-cat Lawi.assembly.full_mask.complex.gff3 |\\  
+cat Lawi.assembly.full_mask.complex.gff3 | \\  
 perl -ane '$id; if(!/^\#/){@F = split(/\t/, $_); chomp $F[-1];$id++; $F[-1] .= "\;ID=$id"; $_ = join("\t", @F)."\n"} print $_' \  
 \> Lawi.assembly.full_mask.complex.reformat.gff3  
 
@@ -469,31 +469,32 @@ metadataAssemblies$makerFullMaskGFF3 <- paste(metadataAssemblies$RepeatDBPath, "
                                               metadataAssemblies$SppAbbrv, ".assembly.full_mask.complex.reformat.gff3", sep = "")
 ```
 
+### 2. Annotation using Genemark-ES.  
 Before we run Maker, we can run Genemark-es, which requires no other input but the genome assemblies. This is supposed to be especially 
-useful for fungal genomes. Once this is running, you can continue on to the chunk that gets the initial run of Maker going, since it doesn't
-depend on the genemark-es outputs for the first round of Maker.
+useful for fungal genomes. Once this is running, you can continue on with the chunk that gets the initial run of Maker going, since it doesn't
+depend on the genemark-es outputs for the first round of Maker.  
 It's a bit tricky to install the genemark-es due to dependencies, but works by installing one at a time all
-dependencies using cpanm. Also, there was an error when trying to run it at first:
-/usr/bin/perl: symbol lookup error: /home/CFIA-ACIA/girouxeml/perl5/lib/perl5/x86_64-linux-thread-multi/auto/List/Util/Util.so: undefined symbol: Perl_xs_apiversion_bootcheck
-The fix was to remove the dir in:
-```{r}
-# ~/perl5/lib/perl5/x86_64-linux-thread-multi/auto/List/Util/
-# in the dir:
-# cd ~/perl5/lib/perl5/
-# mv -f x86_64-linux-thread-multi ~
+dependencies using **cpanm**. Also, there was an error when trying to run it at first:  
+  
+/usr/bin/perl: symbol lookup error: /home/CFIA-ACIA/girouxeml/perl5/lib/perl5/x86_64-linux-thread-multi/auto/List/Util/Util.so: undefined symbol: Perl_xs_apiversion_bootcheck  
+  
+The fix was to remove the directory in _**~/perl5/lib/perl5/x86_64-linux-thread-multi/auto/List/Util/**_ and just 
+placing it in my home directory (or if you want you can just delete it too):  
+  
+**_$ cd ~/perl5/lib/perl5/_**  
+**_$ mv -f x86_64-linux-thread-multi ~ _**  
+  
+See: https://www.reddit.com/r/openbsd/comments/65efvo/openbsd_61_perl_problem_undefined_symbol_perl_xs/  
+  
 
-# I moved it to the home directory just in case I needed it again if things failed, but it can be deleted completely.
-# See: https://www.reddit.com/r/openbsd/comments/65efvo/openbsd_61_perl_problem_undefined_symbol_perl_xs/ 
-```
-
-Run Genemark-es in the species RepeatDB directory:
+#### A. Setting up paths to run Genemark-es in the species RepeatDB directory:
 ```{r}
 for(k in 1:nrow(metadataAssemblies)){
     dir.create(paste(metadataAssemblies$RepeatDBPath[k], "genemark-es_round1", sep = ""), showWarnings = TRUE, recursive = FALSE)}
 metadataAssemblies$genemarkEsRnd1Path <- paste(metadataAssemblies$RepeatDBPath, "genemark-es_round1/", sep = "")
 ```
 
-Run The first round of Genemark-es in the maker_round1 dir:
+#### B. Run The first round of Genemark-es in the maker_round1 dir:
 ```{r}
 prefix <- "genemark-ES_rnd1"
 node   <- 8
@@ -504,12 +505,12 @@ cmd    <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```
 
-To remove the output files after you are done:
+**To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
-Rename the output file to include the organism name:
+**Rename the output file to include the organism name:**
 ```{r}
 cmd <- with(metadataAssemblies,
             paste("cd ", genemarkEsRnd1Path, " && ",
@@ -517,7 +518,7 @@ cmd <- with(metadataAssemblies,
 sapply(cmd, function(x) system(x))
 ```
 
-## 3. Maker Round 1: Initial MAKER Analysis
+### 3. Maker Round 1: Initial MAKER Analysis.  
 MAKER is pretty easy to get going and relies on properly completed control files. In this first round, we will be
 providing the data files for the repeat annotation (rm_gff), the transcriptome assembly (est), and extra protein files from
 related species, which we have retrieved and saved in our References directory. We will also set the model_org to 'simple' 
@@ -529,7 +530,7 @@ for(i in 1:length(metadataAssemblies$RepeatDBPath)){
 metadataAssemblies$maker_rnd1_path <- paste(metadataAssemblies$RepeatDBPath, "maker_round_1/", sep = "")
 ```
 
-Generate the maker control files:
+**Generate the maker control files:**
 ```{r}
 prefix <- "maker_rnd1_CTL"
 cmd <- with(metadataAssemblies, paste("cd ", maker_rnd1_path, " && ", makerPath, " -CTL ", sep = ""))
@@ -539,7 +540,7 @@ metadataAssemblies$makerRnd1_CTL_optsPath <- paste(metadataAssemblies$maker_rnd1
 metadataAssemblies$makerRnd1_CTL_exePath  <- paste(metadataAssemblies$maker_rnd1_path, "maker_exe.ctl", sep = "")
 ```
 
-Command below will edit the altest, altest_gff, model_org, augustus_species, est2genome, protein2genome, and min_contig:
+**The command below will edit the altest, altest_gff, model_org, augustus_species, est2genome, protein2genome, and min_contig:**
 ```{r}
 cmd <- with(metadataAssemblies,
             paste("/opt/rocks/bin/replace",
@@ -556,7 +557,7 @@ cmd <- with(metadataAssemblies,
 sapply(cmd, function(x) system(x))
 ```
 
-Edit the maker_opts.ctl genome paths, and protein paths and rm_gff (repeat modeler) paths to point to desired files:  
+**Edit the maker_opts.ctl genome paths, and protein paths and rm_gff (repeat modeler) paths to point to desired files:**
 ```{r}
 # Edit Genome paths:
 newPattern <- paste("genome=", metadataAssemblies$FixedNewAssemName, sep = "")
@@ -582,7 +583,7 @@ for(i in 1:nrow(metadataAssemblies)){
     makerOptsGenRepl(metadataAssemblies$makerRnd1_CTL_optsPath[i], pattern, newPattern[i])}
 ```
 
-Run MAKER.
+**Run MAKER**  
 Given MAKER will be using BLAST to align transcripts and proteins to the genome, this will take at 
 least a couple days with 12 cores. Speed is a product of the resources you allow (more cores == faster) 
 and the assembly quality (smaller, less contiguous scaffolds == longer).
