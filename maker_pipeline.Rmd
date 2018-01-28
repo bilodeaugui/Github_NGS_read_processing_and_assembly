@@ -43,9 +43,11 @@ sharedPathAn <- paste(sharedPath, analysis, sep="")
 **Define path variables to programs and scripts used:**
 ```{r}
 aedCDFgenePath  <- "/home/CFIA-ACIA/girouxeml/prog/scripts_pl/AED_cdf_generator.pl"
+augustBioCPath  <- "/isilon/biodiversity/pipelines/maker-2.10/augustus.2.7/bin/augustus"
 bedtoolsPath    <- "/opt/bio/BEDTools/bin/bedtools"
 buscoPath       <- "/home/CFIA-ACIA/girouxeml/prog/busco/scripts/run_BUSCO.py"
 buscoPezDataSet <- "/home/CFIA-ACIA/girouxeml/prog/busco_datasets/pezizomycotina_odb9/"
+etrainBioCPath  <- "/isilon/biodiversity/pipelines/maker-2.10/augustus.2.7/bin/etraining"
 fathomPath      <- "/home/CFIA-ACIA/girouxeml/prog/snap/fathom"
 forgePath       <- "/home/CFIA-ACIA/girouxeml/prog/snap/forge"
 genemarkPath    <- "/home/CFIA-ACIA/girouxeml/prog/genemark-es/gmes_petap.pl"
@@ -54,13 +56,17 @@ makerFastamerge <- "/home/CFIA-ACIA/girouxeml/prog/maker/bin/fasta_merge"
 makerGFF3merge  <- "/home/CFIA-ACIA/girouxeml/prog/maker/bin/gff3_merge"
 makerPath       <- "/home/CFIA-ACIA/girouxeml/prog/maker/bin/maker"
 maker2zffPath   <- "/home/CFIA-ACIA/girouxeml/prog/maker/bin/maker2zff"
+newSpeciesPath  <- "/isilon/biodiversity/pipelines/maker-2.10/augustus.2.7/scripts/new_species.pl"
+optimAugustPath <- "/isilon/biodiversity/pipelines/maker-2.10/augustus.2.7/scripts/optimize_augustus.pl"
 pathtRNA_scan   <- "/home/CFIA-ACIA/girouxeml/prog/tRNAscan-SE/bin/tRNAscan-SE"
 pathtRNA_scanBioC  <- "/opt/bio/tRNAscan-SE/bin/tRNAscan-SE"
 processRepeatsPath <- "/home/CFIA-ACIA/girouxeml/prog/RepeatMasker/ProcessRepeats"
+randomSplitPath <- "/isilon/biodiversity/pipelines/maker-2.10/augustus.2.7/scripts/randomSplit.pl"
 repMaskerPath   <- "/home/CFIA-ACIA/girouxeml/prog/RepeatMasker/RepeatMasker"
 repModBuildDBPath  <- "/home/CFIA-ACIA/girouxeml/prog/RepeatModeler-open-1.0.11/BuildDatabase"
 repModlerPath <- "/home/CFIA-ACIA/girouxeml/prog/RepeatModeler-open-1.0.11/RepeatModeler"
 rmOutToGFF3Path <- "/home/CFIA-ACIA/girouxeml/prog/RepeatMasker/util/rmOutToGFF3.pl"
+zff2augGbkPath  <- "/home/CFIA-ACIA/girouxeml/prog/scripts_pl/zff2augustus_gbk.pl"
 ```
 
 **Define paths to reference files used:**  
@@ -959,24 +965,24 @@ cmd <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix3, suffix)
 ```
 
-To remove the output files after you are done:
+**To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix); RemoveQsubTempFiles(sharedPathAn, prefix2); RemoveQsubTempFiles(sharedPathAn, prefix3)
 ```
 
-Delete the unnecessary tmp files created by BUSCO:
+**Delete the unnecessary tmp files created by BUSCO:**
 ```{r}
 # prefix <- "delete_dir"
 # cmd <- with(metadataAssemblies, paste("cd ", RepeatDBPath, " && rm -rf maker_round_2 ", sep = ""))
 # suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
-To remove the output files after you are done:
+**To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
-Now go up to the RepeatDB dir, and create a dir for the next round of MAKER:
+**Now go up to the RepeatDB dir, and create a dir for the next round of MAKER:**
 ```{r}
 for(k in 1:nrow(metadataAssemblies)){
     dir.create(paste(metadataAssemblies$RepeatDBPath[k], "maker_round_2", sep = ""), 
@@ -984,7 +990,7 @@ for(k in 1:nrow(metadataAssemblies)){
 metadataAssemblies$maker_rnd2_path <- paste(metadataAssemblies$RepeatDBPath, "maker_round_2/", sep = "")
 ```
 
-Generate the MAKER control files for the second round of MAKER:
+**Generate the MAKER control files for the second round of MAKER:**
 ```{r}
 prefix <- "maker_rnd2_CTL"
 cmd <- with(metadataAssemblies, paste("cd ", maker_rnd2_path, " && ", makerPath, " -CTL ", sep = ""))
@@ -994,7 +1000,7 @@ metadataAssemblies$makerRnd2_CTL_optsPath <- paste(metadataAssemblies$maker_rnd2
 metadataAssemblies$makerRnd2_CTL_exePath <- paste(metadataAssemblies$maker_rnd2_path, "maker_exe.ctl", sep = "")
 ```
 
-To remove the output files after you are done:
+**To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
@@ -1040,7 +1046,7 @@ for(i in 1:nrow(metadataAssemblies)){
     makerOptsGenRepl(metadataAssemblies$makerRnd2_CTL_optsPath[i], pattern, newPattern[i])}
 ```
 
-Then we can run MAKER, substituting this new control file, and summarize the output, as we did before.
+**Then we can run MAKER, substituting this new control file, and summarize the output, as we did before.**
 ```{r}
 prefix <- "maker_round_2_run"
 node   <- 12
@@ -1054,12 +1060,12 @@ cmd    <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```
 
-To remove the output files after you are done:
+**To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
-We conclude by assembling together the GFF and FASTA outputs.
+**We conclude by assembling together the GFF and FASTA outputs.**
 ```{r}
 metadataAssemblies$makerRnd2_OutputPath <- paste(metadataAssemblies$maker_rnd2_path, metadataAssemblies$SppAbbrv, "_rnd2.maker.output/", sep = "")
 
@@ -1087,12 +1093,12 @@ cmd <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix3, suffix)
 ```
 
-To remove the output files after you are done:
+**To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix); RemoveQsubTempFiles(sharedPathAn, prefix2); RemoveQsubTempFiles(sharedPathAn, prefix3)
 ```
 
-Export 'confident' gene models from MAKER and rename to something meaningful
+**Export confident gene models from round 1 of MAKER using maker2zff:**  
 For determining which genes are High Confidence for Retraining:
 ```{r}
 for(k in 1:nrow(metadataAssemblies)){
@@ -1110,12 +1116,12 @@ cmd <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
-To remove the output files after you are done:
+**To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
-Take a quick look at number of seqs in genome.dna file
+**Take a quick look at number of sequences in the genome.dna file:**
 ```{r}
 cmd <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ", 'grep ">" genome.dna | wc -l ', sep = ""))
 sapply(cmd, function(x) system(x))
@@ -1129,7 +1135,7 @@ cmd <- with(metadataAssemblies, file.rename(paste(snapRnd1MakerRnd2Path, "genome
 sapply(cmd, function(x) system(x))
 ```
 
-Gather some stats and validate:
+**Gather some stats and validate:**
 ```{r}
 prefix <- "round2_fathom_stats"
 cmd    <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ", fathomPath, " ", 
@@ -1144,12 +1150,12 @@ cmd2   <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ", f
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 ```
 
-To remove the output files after you are done:
+**To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix); RemoveQsubTempFiles(sharedPathAn, prefix2)
 ```
 
-Collect the training sequences and annotations, plus 1000 surrounding bp for training
+**Collect the training sequences and annotations, plus 1000 surrounding bp for training**
 ```{r}
 prefix <- "round2_fathom_categorize"
 cmd    <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ", fathomPath, " ", 
@@ -1157,12 +1163,13 @@ cmd    <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ", f
                                       " -categorize 1000 > categorize.log 2>&1 ", sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
-To remove the output files after you are done:
+
+**To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
-Wait for the categorize run to finish before doing the export, which is next.
+**Wait for the categorize run to finish before doing the export, which is next.**
 ```{r}
 prefix2 <- "round2_fathom_export"
 cmd2    <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ",
@@ -1170,11 +1177,131 @@ cmd2    <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ",
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 ```
 
-To remove the output files after you are done:
+**To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix2)
 ```
 
+__Training Augustus - Round 2__  
+We won't be using BUSCO to train Augustus the second time since as there is a bias in the models it
+produces for conserved genes that tend to be short and intron poor. To avoid this bias in the second round, we use a broad selection of gene models instead. After using the maker2zff script and then fathom to generate the 
+export.ann and export.dna files, we will use a script that converts the zff files to GenBank format to 
+train Augustus using the zff2augustus_gbk.pl script available at:  
+https://github.com/hyphaltip/genome-scripts/blob/master/gene_prediction/zff2augustus_gbk.pl.  
+  
+**Set up the training directories:**
+```{r}
+for(k in 1:nrow(metadataAssemblies)){
+    dir.create(paste(metadataAssemblies$maker_rnd2_path[k], "rnd2_Augustus_Training", sep = ""), showWarnings = TRUE, recursive = FALSE)}
+
+metadataAssemblies$rnd2_AugTrain <- paste(metadataAssemblies$maker_rnd2_path, "rnd2_Augustus_Training/", sep = "")
+```
+
+**Convert the zff files to GenBank format to prepare for Augustus training:**
+```{r}
+prefix <- "round2_Augustus_zff2gbk"
+
+cmd <- with(metadataAssemblies, 
+            paste("cd ", rnd2_AugTrain, " && ", zff2augGbkPath, 
+                  " ", paste(snapRnd1MakerRnd2Path, "export.ann", sep = ""),
+                  " ", paste(snapRnd1MakerRnd2Path, "export.dna", sep = ""),
+                  " > ", SppAbbrv, ".train.gb",
+                  sep = ""))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+metadataAssemblies$rnd2AugTrainGB <- paste(metadataAssemblies$rnd2_AugTrain, metadataAssemblies$SppAbbrv,
+                                           ".train.gb", sep = "")
+```
+
+**To remove the output files after you are done:**
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+Not sure of the following steps, so they are test and need to be reviewed. They follow the steps
+outlined in https://vcru.wisc.edu/simonlab/bioinformatics/programs/augustus/docs/tutorial2015/training.html.  
+**Randomly split the set of annotated sequences in a training and a test set:**
+```{r}
+
+
+# randomSplit.pl genes.gb 100
+```
+
+
+# We've now completed the 2nd round of MAKER. 
+# We can see how things are going by evaluating the gene models we have so far:
+A. Count the number of gene models and the gene lengths:
+I manually recorded the output values to a summary BUSCO excel file. Welcome to ideas on how to capture the output.
+```{r}
+cmd <- with(metadataAssemblies, 
+            paste("cd ", makerRnd2_OutputPath, " && ", " cat ", SppAbbrv, "_rnd2.all.maker.gff3 ", 
+                  " | awk '{ if ($3 ==", '"gene") print $0}', 
+                  "' | awk '{ sum += ($5 - $4) } END { print NR, sum / NR }'", sep = ""))
+
+cmd[1]
+sapply(cmd, function(x) system(x))
+```
+
+B. Visualize the AED distribution. AED ranges from 0 to 1 and quantifies the confidence in a gene model 
+based on empirical evidence. Basically, the lower the AED, the better a gene model is likely to be. Ideally, 
+95% or more of the gene models will have an AED of 0.5 or better in the case of good assemblies. You can use 
+this AED_cdf_generator.pl script to help with this.
+I have just recorded the fraction at 0.5 into my summary excel table. Open to ideas on how to capture it better. 
+```{r}
+cmd <- with(metadataAssemblies, 
+            paste("cd ", makerRnd2_OutputPath, " && ", " perl ", aedCDFgenePath, 
+                  " -b 0.025 ", SppAbbrv, "_rnd2.all.maker.gff3", sep = "")) 
+cmd[1]
+sapply(cmd, function(x) system(x))
+```
+
+C. Run BUSCO using the Augustus species HMM to look at the results, without training Augustus. Only include the 
+transcript sequences, and not the 1000 bp on each side, and be sure to take the best (i.e., longest) transcript for
+each gene so we aren't artificially seeding duplicates. We could also run it on the best protein sequence per gene
+instead. 
+```{r}
+prefix <- "round2_eval_with_Busco"
+node   <- 8
+cmd    <- with(metadataAssemblies,
+               paste("cd ", makerRnd2_OutputPath, " && ",
+                     "python ", buscoPath, " -i ", paste(SppAbbrv, "_rnd2.all.maker.transcripts.fasta", sep = ""),
+                     " -o annotation_eval ", " -c ", node,
+                     " -l ", buscoPezDataSet, " -m transcriptome -sp ", ScientificName, " -z --augustus_parameters='--progress=true'",
+                     " --restart ", 
+                     " --force ", 
+                     sep = ""))
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
+# Note, if the run fails, restart the run with the following "--restart", it will continue from where it left off. However, check the 
+# config.ini file in ~/prog/busco/config/ to make sure that restart is set to True, and that you adjust to the correct cpus number.
+```
+
+D. Visualise the gene models from Augustus, SNAP, and MAKER, also Genemark-es using a genome browser such as JBrowse.
+With JBrowse, you can essentially follow this guide to get this started. A helpful resource is this gff2jbrowse.pl script, 
+which automates adding tracks to the browser based on the GFF output of your MAKER run. It is best to use 5-10 longer, gene 
+dense scaffolds and visually inspect them. When SNAP and Augustus are well trained, their models should overlap pretty 
+closely with the final MAKER models. Moreover, there will be spurious hits from SNAP and Augustus, but they are usually short, 
+1-2 exon annotations and don't have empirical support. You'll get a sense of a good annotation with some experience. Also, it 
+is possible SNAP won't produce good results, depending on your organism, which the MAKER folks have pointed out in the 
+past (Augustus usually does pretty well).
+```{r}
+# Have yet to determine quickest way to do this on our cluster.
+```
+
+6. Iteratively Running MAKER to Improve Annotation
+One of the beauties of MAKER is that it can be run iteratively, using the gene models from the one round to train 
+ab initio software to improve the inference of gene models in the next round. Essentially, all one has to do is repeat 
+steps 4 and 5 to perform another round of annotation. The MAKER creators/maintainers recommend at least a couple rounds 
+of ab initio software training and MAKER annotation (i.e., 3 rounds total) and returns start to diminish (at differing rates) 
+thereafter. One needs to be careful not to overtrain Augustus and SNAP, so more rounds isn't necessarily always better. 
+Keep evaluating your gene models after successive rounds of MAKER to identify when you have sound models.
+
+## Running round 3 of MAKER:
+
+
+##############################################
+The chunks below were removed from the pipeline for the second round of MAKER after being advised to 
+NOT train Augustus with BUSCO again after the 2nd round of MAKER:
+*** Note - remove the next chunk!!!
 Create the training parameters:
 ```{r}
 for(k in 1:nrow(metadataAssemblies)){
@@ -1243,6 +1370,7 @@ https://groups.google.com/forum/#!topic/maker-devel/FhlVr1pKPw4
 Run BUSCO again, with Pezizomycotina set of conserved genes, as in round 1. However, for Augustus,
 we will specify our species-specific HMM models. 
 ** Over here!! All species assemblies, except Lawi2 had this started 25jan2018
+**** Note - counselled to not train Augustus with BUSCO for the second round!
 ```{r}
 prefix <- "round2_Busco"
 node   <- 8
@@ -1316,78 +1444,6 @@ cmd <- with(metadataAssemblies,
                   " /home/CFIA-ACIA/girouxeml/prog/augustus/config/species/", ScientificName, sep = ""))
 sapply(cmd, function(x) system(x))
 ```
-
-# We've now completed the 2nd round of MAKER, and run a second Augustus training session using BUSCO. 
-# We can see how things are going by evaluating the gene models we have so far:
-A. Count the number of gene models and the gene lengths:
-I manually recorded the output values to a summary BUSCO excel file. Welcome to ideas on how to capture the output.
-```{r}
-cmd <- with(metadataAssemblies, 
-            paste("cd ", makerRnd2_OutputPath, " && ", " cat ", SppAbbrv, "_rnd2.all.maker.gff3 ", 
-                  " | awk '{ if ($3 ==", '"gene") print $0}', 
-                  "' | awk '{ sum += ($5 - $4) } END { print NR, sum / NR }'", sep = ""))
-
-cmd[1]
-sapply(cmd, function(x) system(x))
-```
-
-B. Visualize the AED distribution. AED ranges from 0 to 1 and quantifies the confidence in a gene model 
-based on empirical evidence. Basically, the lower the AED, the better a gene model is likely to be. Ideally, 
-95% or more of the gene models will have an AED of 0.5 or better in the case of good assemblies. You can use 
-this AED_cdf_generator.pl script to help with this.
-I have just recorded the fraction at 0.5 into my summary excel table. Open to ideas on how to capture it better. 
-```{r}
-cmd <- with(metadataAssemblies, 
-            paste("cd ", makerRnd2_OutputPath, " && ", " perl ", aedCDFgenePath, 
-                  " -b 0.025 ", SppAbbrv, "_rnd2.all.maker.gff3", sep = "")) 
-cmd[1]
-sapply(cmd, function(x) system(x))
-```
-
-C. Run BUSCO using the Augustus species HMM to look at the results, without training Augustus. Only include the 
-transcript sequences, and not the 1000 bp on each side, and be sure to take the best (i.e., longest) transcript for
-each gene so we aren't artificially seeding duplicates. We could also run it on the best protein sequence per gene
-instead. 
-```{r}
-prefix <- "round2_eval_with_Busco"
-node   <- 8
-cmd    <- with(metadataAssemblies,
-               paste("cd ", makerRnd2_OutputPath, " && ",
-                     "python ", buscoPath, " -i ", paste(SppAbbrv, "_rnd2.all.maker.transcripts.fasta", sep = ""),
-                     " -o annotation_eval ", " -c ", node,
-                     " -l ", buscoPezDataSet, " -m transcriptome -sp ", ScientificName, " -z --augustus_parameters='--progress=true'",
-                     " --restart ", 
-                     " --force ", 
-                     sep = ""))
-
-suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
-# Note, if the run fails, restart the run with the following "--restart", it will continue from where it left off. However, check the 
-# config.ini file in ~/prog/busco/config/ to make sure that restart is set to True, and that you adjust to the correct cpus number.
-```
-
-D. Visualise the gene models from Augustus, SNAP, and MAKER, also Genemark-es using a genome browser such as JBrowse.
-With JBrowse, you can essentially follow this guide to get this started. A helpful resource is this gff2jbrowse.pl script, 
-which automates adding tracks to the browser based on the GFF output of your MAKER run. It is best to use 5-10 longer, gene 
-dense scaffolds and visually inspect them. When SNAP and Augustus are well trained, their models should overlap pretty 
-closely with the final MAKER models. Moreover, there will be spurious hits from SNAP and Augustus, but they are usually short, 
-1-2 exon annotations and don't have empirical support. You'll get a sense of a good annotation with some experience. Also, it 
-is possible SNAP won't produce good results, depending on your organism, which the MAKER folks have pointed out in the 
-past (Augustus usually does pretty well).
-```{r}
-# Have yet to determine quickest way to do this on our cluster.
-```
-
-6. Iteratively Running MAKER to Improve Annotation
-One of the beauties of MAKER is that it can be run iteratively, using the gene models from the one round to train 
-ab initio software to improve the inference of gene models in the next round. Essentially, all one has to do is repeat 
-steps 4 and 5 to perform another round of annotation. The MAKER creators/maintainers recommend at least a couple rounds 
-of ab initio software training and MAKER annotation (i.e., 3 rounds total) and returns start to diminish (at differing rates) 
-thereafter. One needs to be careful not to overtrain Augustus and SNAP, so more rounds isn't necessarily always better. 
-Keep evaluating your gene models after successive rounds of MAKER to identify when you have sound models.
-
-## Running round 3 of MAKER:
-
-
 
 
 
