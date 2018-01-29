@@ -44,6 +44,7 @@ sharedPathAn <- paste(sharedPath, analysis, sep="")
 ```{r}
 aedCDFgenePath  <- "/home/CFIA-ACIA/girouxeml/prog/scripts_pl/AED_cdf_generator.pl"
 augustBioCPath  <- "/isilon/biodiversity/pipelines/maker-2.10/augustus.2.7/bin/augustus"
+augEvalBioCPath <- "/isilon/biodiversity/pipelines/maker-2.10/augustus.2.7/bin/augustus"
 bedtoolsPath    <- "/opt/bio/BEDTools/bin/bedtools"
 buscoPath       <- "/home/CFIA-ACIA/girouxeml/prog/busco/scripts/run_BUSCO.py"
 buscoPezDataSet <- "/home/CFIA-ACIA/girouxeml/prog/busco_datasets/pezizomycotina_odb9/"
@@ -288,8 +289,7 @@ I used the known library from repeatmasker.lib.EMBL, which I converted to fasta 
 Then we pass the species genome assemblies through the RepeatMaskerLib.fasta using RepeatMasker.
 ```{r}
 for(i in 1:length(metadataAssemblies$RepeatDBPath)){
-    dir.create(paste(metadataAssemblies$RepeatDBPath[i], "embl_mask", sep = ""), showWarnings = TRUE, recursive = FALSE)
-}
+    dir.create(paste(metadataAssemblies$RepeatDBPath[i], "embl_mask", sep = ""), showWarnings = TRUE, recursive = FALSE)}
 metadataAssemblies$embl_mask_path <- paste(metadataAssemblies$RepeatDBPath, "embl_mask/", sep = "")
 
 prefix <- "embl_mask"
@@ -308,8 +308,7 @@ using the known and unknown *Lachnellula* repeat libraries created, split, so th
 would be preferentially annotated over unknown, to the degree possible.  
 ```{r}
 for(i in 1:length(metadataAssemblies$RepeatDBPath)){
-    dir.create(paste(metadataAssemblies$RepeatDBPath[i], "Known_Mask", sep = ""), showWarnings = TRUE, recursive = FALSE)
-}
+    dir.create(paste(metadataAssemblies$RepeatDBPath[i], "Known_Mask", sep = ""), showWarnings = TRUE, recursive = FALSE)}
 metadataAssemblies$Known_Mask_path <- paste(metadataAssemblies$RepeatDBPath, "Known_Mask/", sep = "")
 
 prefix <- "Known_Mask"
@@ -346,8 +345,7 @@ suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```{r}
 # Make a directory in each species dir for the repeats masked with the embl lib:
 for(i in 1:length(metadataAssemblies$RepeatDBPath)){
-    dir.create(paste(metadataAssemblies$RepeatDBPath[i], "Full_mask", sep = ""), showWarnings = TRUE, recursive = FALSE)
-}
+    dir.create(paste(metadataAssemblies$RepeatDBPath[i], "Full_mask", sep = ""), showWarnings = TRUE, recursive = FALSE)}
 
 prefix <- "copy_masked_rep_fna"
 cmd    <- with(metadataAssemblies,
@@ -361,7 +359,7 @@ cmd2    <- with(metadataAssemblies,
                 paste("cp ", paste(RepeatDBPath, "Unknown_Mask/*.fna.masked.masked.out ", sep = ""),
                       paste(RepeatDBPath, "Full_mask/", SppAbbrv, ".assembly.full_mask.out", sep = ""),
                       sep = ""))
-suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
+suffix  <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 ```
 
 **Gunzip and then cat repeat outputs:**
@@ -407,9 +405,9 @@ Finally, in order to feed these repeats into MAKER properly, we must separate ou
 **Create GFF3:**
 ```{r}
 prefix <- "rmOutToGFF3"
-cmd <- with(metadataAssemblies, 
-            paste(rmOutToGFF3Path, " ", paste(RepeatDBPath, "Full_mask/*.full_mask.out ", sep = ""),
-                  " > ", paste(RepeatDBPath, "Full_mask/", SppAbbrv, ".assembly.full_mask.out.gff3", sep = ""), sep = ""))
+cmd    <- with(metadataAssemblies, 
+               paste(rmOutToGFF3Path, " ", paste(RepeatDBPath, "Full_mask/*.full_mask.out ", sep = ""),
+                     " > ", paste(RepeatDBPath, "Full_mask/", SppAbbrv, ".assembly.full_mask.out.gff3", sep = ""), sep = ""))
 
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
@@ -417,11 +415,11 @@ suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 **Isolate complex repeats:**
 ```{r}
 prefix <- "isolate_complex_Repeats"
-cmd <- with(metadataAssemblies, 
-            paste('grep -v -e "Satellite" -e ")n" -e "-rich"',
-                  " ", paste(RepeatDBPath, "Full_mask/", SppAbbrv, ".assembly.full_mask.out.gff3", sep = ""),
-                  " > ", paste(RepeatDBPath, "Full_mask/", SppAbbrv, ".assembly.full_mask.complex.gff3", sep = ""),
-                  sep = ""))
+cmd    <- with(metadataAssemblies, 
+               paste('grep -v -e "Satellite" -e ")n" -e "-rich"',
+                     " ", paste(RepeatDBPath, "Full_mask/", SppAbbrv, ".assembly.full_mask.out.gff3", sep = ""),
+                     " > ", paste(RepeatDBPath, "Full_mask/", SppAbbrv, ".assembly.full_mask.complex.gff3", sep = ""),
+                     sep = ""))
             
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
@@ -539,7 +537,7 @@ metadataAssemblies$maker_rnd1_path <- paste(metadataAssemblies$RepeatDBPath, "ma
 #### A. Generate the MAKER control files.
 ```{r}
 prefix <- "maker_rnd1_CTL"
-cmd <- with(metadataAssemblies, paste("cd ", maker_rnd1_path, " && ", makerPath, " -CTL ", sep = ""))
+cmd    <- with(metadataAssemblies, paste("cd ", maker_rnd1_path, " && ", makerPath, " -CTL ", sep = ""))
 
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 metadataAssemblies$makerRnd1_CTL_optsPath <- paste(metadataAssemblies$maker_rnd1_path, "maker_opts.ctl", sep = "")
@@ -568,14 +566,14 @@ sapply(cmd, function(x) system(x))
 ```{r}
 # Edit Genome paths:
 newPattern <- paste("genome=", metadataAssemblies$FixedNewAssemName, sep = "")
-pattern <- "genome= "
+pattern    <- "genome= "
 
 for(i in 1:nrow(metadataAssemblies)){
     makerOptsGenRepl(metadataAssemblies$makerRnd1_CTL_optsPath[i], pattern, newPattern[i])}
 
 # Edit protein path pattern, using this function to make sure "protein= " is edited, and not
 # "repeat_protein=/home/CFIA-ACIA/girouxeml/prog/maker/data/te_proteins.fasta".
-pattern <- "protein= "
+pattern    <- "protein= "
 newPattern <- paste("protein=", pepBotcinPath, ",", pepGlarlozPath, ",", pepMarbrunPath, ",", pepPhiascoPath, 
                     ",", pepPhiasubPath, ",", pepRhyncomPath, ",", pepScleborPath, ",", pepSclerscPath, sep = "")
 
@@ -583,7 +581,7 @@ for(i in 1:nrow(metadataAssemblies)){
     makerOptsGenRepl(metadataAssemblies$makerRnd1_CTL_optsPath[i], pattern, newPattern)}
 
 # Edit repeat modeler, "rm_gff= ", path:
-pattern <- "rm_gff= "
+pattern    <- "rm_gff= "
 newPattern <- paste("rm_gff=", metadataAssemblies$makerFullMaskGFF3, sep = "")
 
 for(i in 1:nrow(metadataAssemblies)){
@@ -596,15 +594,14 @@ least a couple days with 12 cores. Speed is a product of the resources you allow
 and the assembly quality (smaller, less contiguous scaffolds == longer).
 ```{r}
 prefix <- "maker_round_1_run"
-node <- 12
-cmd <- with(metadataAssemblies,
-            paste("cd ", maker_rnd1_path, " && ", makerPath, 
-                  " -base ", paste(SppAbbrv, "_rnd1", sep = ""),
-                  " ", paste(maker_rnd1_path, "maker_opts.ctl", sep = ""),
-                  " ", paste(maker_rnd1_path, "maker_bopts.ctl", sep = ""),
-                  " ", paste(maker_rnd1_path, "maker_exe.ctl", sep = ""),
-                  " -cpus 12 ",
-                  sep = ""))
+node   <- 12
+cmd    <- with(metadataAssemblies,
+               paste("cd ", maker_rnd1_path, " && ", makerPath, 
+                     " -base ", paste(SppAbbrv, "_rnd1", sep = ""),
+                     " ", paste(maker_rnd1_path, "maker_opts.ctl", sep = ""),
+                     " ", paste(maker_rnd1_path, "maker_bopts.ctl", sep = ""),
+                     " ", paste(maker_rnd1_path, "maker_exe.ctl", sep = ""),
+                     " -cpus 12 ", sep = ""))
 
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```
@@ -620,28 +617,28 @@ metadataAssemblies$makerRnd1_OutputPath <- paste(metadataAssemblies$maker_rnd1_p
 
 # GFF with the sequences:
 prefix <- "mergeGFF3_maker_all"
-cmd <- with(metadataAssemblies,
-            paste("cd ", makerRnd1_OutputPath, " && ", makerGFF3merge, " -s -d ",
-                  paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1_master_datastore_index.log", sep = ""),
-                  " > ", paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1.all.maker.gff3", sep = ""), sep = ""))
+cmd    <- with(metadataAssemblies,
+               paste("cd ", makerRnd1_OutputPath, " && ", makerGFF3merge, " -s -d ",
+                     paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1_master_datastore_index.log", sep = ""),
+                     " > ", paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1.all.maker.gff3", sep = ""), sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 
 # Collect all the fastas:
 prefix2 <- "fastaMerge_maker"
-cmd2 <- with(metadataAssemblies,
-             paste("cd ", makerRnd1_OutputPath, " && ", makerFastamerge, " -d ",
-                   paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1_master_datastore_index.log", sep = ""),
-                   sep = ""))
-suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
+cmd2    <- with(metadataAssemblies,
+                paste("cd ", makerRnd1_OutputPath, " && ", makerFastamerge, " -d ",
+                      paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1_master_datastore_index.log", sep = ""),
+                      sep = ""))
+suffix  <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 
 # GFF without the sequences:
 prefix3 <- "mergeGFF3_maker_all_noseq" 
-cmd3 <- with(metadataAssemblies,
-             paste("cd ", makerRnd1_OutputPath, " && ", makerGFF3merge, " -n -s -d ",
-                   paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1_master_datastore_index.log", sep = ""),
-                   " > ", paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""),
-                  sep = ""))
-suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd3, prefix3, suffix)
+cmd3    <- with(metadataAssemblies,
+                paste("cd ", makerRnd1_OutputPath, " && ", makerGFF3merge, " -n -s -d ",
+                      paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1_master_datastore_index.log", sep = ""),
+                      " > ", paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""),
+                     sep = ""))
+suffix  <- ".sub"; cat(bashDirections); MakeQsubs(cmd3, prefix3, suffix)
 ```
 
 **To remove the output files after you are done:**
@@ -678,9 +675,9 @@ for(k in 1:nrow(metadataAssemblies)){
 metadataAssemblies$snapRnd1MakerRnd1Path <- paste(metadataAssemblies$snapMakerRnd1Path, "round1/", sep = "")
 
 prefix <- "snapMaker2zff"
-cmd <- with(metadataAssemblies,
-            paste("cd ", snapRnd1MakerRnd1Path, " && ", maker2zffPath, " -x 0.25 -l 50 -c 0 -e 0 -o 0 -d ", 
-                  paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1_master_datastore_index.log", sep = ""), sep = ""))
+cmd    <- with(metadataAssemblies,
+               paste("cd ", snapRnd1MakerRnd1Path, " && ", maker2zffPath, " -x 0.25 -l 50 -c 0 -e 0 -o 0 -d ", 
+                     paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1_master_datastore_index.log", sep = ""), sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
@@ -706,20 +703,20 @@ sapply(cmd, function(x) system(x))
 **Gather some stats and validate using fathom:**
 ```{r}
 prefix <- "fathom_MakerRnd1_stats"
-cmd <- with(metadataAssemblies,
-            paste("cd ", snapRnd1MakerRnd1Path, " && ",
-                  fathomPath, " ", paste(SppAbbrv, "_rnd1.zff.ann", sep = ""),
-                  " ", paste(SppAbbrv, "_rnd1.zff.dna", sep = ""),
-                  " -gene-stats > gene-stats.log 2>&1 ", sep = ""))
+cmd    <- with(metadataAssemblies,
+               paste("cd ", snapRnd1MakerRnd1Path, " && ",
+                     fathomPath, " ", paste(SppAbbrv, "_rnd1.zff.ann", sep = ""),
+                     " ", paste(SppAbbrv, "_rnd1.zff.dna", sep = ""),
+                     " -gene-stats > gene-stats.log 2>&1 ", sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 
 prefix2 <- "fathom_MakerRnd1_validate"
-cmd2 <- with(metadataAssemblies, 
-             paste("cd ", snapRnd1MakerRnd1Path, " && ", 
-                   fathomPath, " ", paste(SppAbbrv, "_rnd1.zff.ann", sep = ""),
-                   " ", paste(SppAbbrv, "_rnd1.zff.dna", sep = ""),
-                   " -validate > validate.log 2>&1 ", sep = ""))
-suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
+cmd2    <- with(metadataAssemblies, 
+                paste("cd ", snapRnd1MakerRnd1Path, " && ", 
+                      fathomPath, " ", paste(SppAbbrv, "_rnd1.zff.ann", sep = ""),
+                      " ", paste(SppAbbrv, "_rnd1.zff.dna", sep = ""),
+                      " -validate > validate.log 2>&1 ", sep = ""))
+suffix  <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 ```
 
 **To remove the output files after you are done:**
@@ -730,11 +727,11 @@ RemoveQsubTempFiles(sharedPathAn, prefix); RemoveQsubTempFiles(sharedPathAn, pre
 **Collect the training sequences and annotations, plus 1000 surrounding bp for training using fathom:**
 ```{r}
 prefix <- "fathom_MakerRnd1_categorize"
-cmd <- with(metadataAssemblies,
-            paste("cd ", snapRnd1MakerRnd1Path, " && ",
-                  fathomPath, " ", paste(SppAbbrv, "_rnd1.zff.ann", sep = ""),
-                  " ", paste(SppAbbrv, "_rnd1.zff.dna", sep = ""),
-                  " -categorize 1000 > categorize.log 2>&1 ", sep = ""))
+cmd    <- with(metadataAssemblies,
+               paste("cd ", snapRnd1MakerRnd1Path, " && ",
+                     fathomPath, " ", paste(SppAbbrv, "_rnd1.zff.ann", sep = ""),
+                     " ", paste(SppAbbrv, "_rnd1.zff.dna", sep = ""),
+                     " -categorize 1000 > categorize.log 2>&1 ", sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
@@ -742,9 +739,9 @@ Wait for the chunk above to complete before running this next one. It depends on
 previous as input.
 ```{r}
 prefix2 <- "fathom_MakerRnd1_export"
-cmd2 <- with(metadataAssemblies,
-             paste("cd ", snapRnd1MakerRnd1Path, " && ",
-                   fathomPath, " uni.ann uni.dna -export 1000 -plus > uni-plus.log 2>&1 ", sep = ""))
+cmd2    <- with(metadataAssemblies,
+                paste("cd ", snapRnd1MakerRnd1Path, " && ",
+                      fathomPath, " uni.ann uni.dna -export 1000 -plus > uni-plus.log 2>&1 ", sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 ```
 
@@ -757,13 +754,12 @@ RemoveQsubTempFiles(sharedPathAn, prefix); RemoveQsubTempFiles(sharedPathAn, pre
 ```{r}
 for(k in 1:nrow(metadataAssemblies)){
     dir.create(paste(metadataAssemblies$snapMakerRnd1Path[k], "round1/params", sep = ""),
-               showWarnings = TRUE, recursive = FALSE)
-}
+               showWarnings = TRUE, recursive = FALSE)}
 
 prefix <- "forge_MakerRnd1"
-cmd <- with(metadataAssemblies,
-            paste("cd ", paste(snapRnd1MakerRnd1Path, "params/", sep = ""), " && ",
-                  forgePath, " ../export.ann ../export.dna > ../forge.log 2>&1 ", sep = ""))
+cmd    <- with(metadataAssemblies,
+               paste("cd ", paste(snapRnd1MakerRnd1Path, "params/", sep = ""), " && ",
+                     forgePath, " ../export.ann ../export.dna > ../forge.log 2>&1 ", sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
@@ -775,10 +771,10 @@ RemoveQsubTempFiles(sharedPathAn, prefix)
 **Assemble the HMM:**
 ```{r}
 prefix <- "hmmAssembler_MakerRnd1"
-cmd <- with(metadataAssemblies,
-            paste("cd ", snapRnd1MakerRnd1Path, " && ",
-                  hmmAssemPath, " ", paste(SppAbbrv, "_rnd1.zff", sep = ""),
-                  " params > ", paste(SppAbbrv, "_rnd1.zff.hmm", sep = ""), sep = ""))
+cmd    <- with(metadataAssemblies,
+               paste("cd ", snapRnd1MakerRnd1Path, " && ",
+                     hmmAssemPath, " ", paste(SppAbbrv, "_rnd1.zff", sep = ""),
+                     " params > ", paste(SppAbbrv, "_rnd1.zff.hmm", sep = ""), sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
@@ -804,16 +800,16 @@ sequences using the gene models we created in our first run of MAKER. We do this
 to excise the regions that contain mRNA annotations based on our initial MAKER run (with 1000bp on each side).
 ```{r}
 prefix <- "maker-augustus_get_mRNA_regions_Rnd1"
-cmd <- with(metadataAssemblies,
-            paste("cd ", snapRnd1MakerRnd1Path, " && ",
-                  paste(' awk -v OFS="\t" \'{ if ($3 == "mRNA") print $1, $4, $5 }\'', sep = ""),
-                  " ", paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""),
-                  " | \ ",
-                  paste('awk -v OFS="\t" \'{ if ($2 < 1000) print $1, "0", $3+1000; else print $1, $2-1000, $3+1000 }\'', sep = ""),
-                  " | \ ",
-                  bedToolsPath, " getfasta -fi ", FixedNewAssemName, " -bed - -fo ",
-                  paste(SppAbbrv, "_rnd1.all.maker.transcripts1000.fasta", sep = "")))
-cmd[1]
+cmd    <- with(metadataAssemblies,
+               paste("cd ", snapRnd1MakerRnd1Path, " && ",
+                     paste(' awk -v OFS="\t" \'{ if ($3 == "mRNA") print $1, $4, $5 }\'', sep = ""),
+                     " ", paste(makerRnd1_OutputPath, SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""),
+                     " | \ ",
+                     paste('awk -v OFS="\t" \'{ if ($2 < 1000) print $1, "0", $3+1000; else print $1, $2-1000, $3+1000 }\'', sep = ""),
+                     " | \ ",
+                     bedToolsPath, " getfasta -fi ", FixedNewAssemName, " -bed - -fo ",
+                     paste(SppAbbrv, "_rnd1.all.maker.transcripts1000.fasta", sep = "")))
+
 # Note, open the bash scripts, and edit so put the "\t" back in.
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
@@ -850,15 +846,15 @@ take a lot longer though, but at least it's still moving along.
 **Run BUSCO:**
 ```{r}
 prefix <- "Busco_MakerRnd1"
-node <- 8
-cmd <- with(metadataAssemblies,
-            paste("cd ", snapRnd1MakerRnd1Path, " && ",
-                  "python ", buscoPath, " -i ", paste(SppAbbrv, "_rnd1.all.maker.transcripts1000.fasta", sep = ""),
-                  " -o ", paste(SppAbbrv, "_rnd1_maker", sep = ""), " -c ", node,
-                  " -l ", buscoPezDataSet, " -m genome -sp botrytis_cinerea -z --augustus_parameters='--progress=true'",
-                  " --long --restart",
-                  " -f ", # If forced to restart and there is a problem with the previous run and you shouldn't use restart.
-                  sep = ""))
+node   <- 8
+cmd    <- with(metadataAssemblies,
+               paste("cd ", snapRnd1MakerRnd1Path, " && ",
+                     "python ", buscoPath, " -i ", paste(SppAbbrv, "_rnd1.all.maker.transcripts1000.fasta", sep = ""),
+                     " -o ", paste(SppAbbrv, "_rnd1_maker", sep = ""), " -c ", node,
+                     " -l ", buscoPezDataSet, " -m genome -sp botrytis_cinerea -z --augustus_parameters='--progress=true'",
+                     " --long --restart",
+                     " -f ", # If forced to restart and there is a problem with the previous run and you shouldn't use restart.
+                     sep = ""))
 
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 # Note, if the run fails, restart the run with the following "--restart", it will continue from where it left off. However, check the 
@@ -936,32 +932,32 @@ empicial evidence we have from the first MAKER round, so we don't have to perfor
 ```{r}
 # Transcript alignments - our file will be empty, as we have no est or transcript evidence, so may need to fix this:
 prefix <- "maker_rnd2_transcript_evidence"
-cmd <- with(metadataAssemblies,
-            paste("cd ", makerRnd1_OutputPath, " && ",
-                  paste(" awk '{ if ", '($2 == "est2genome") print $0 }', "'", sep = ""),
-                  " ", paste(SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""), 
-                  " > ", paste(SppAbbrv, "_rnd1.all.maker.est2genome.gff3", sep = ""),
-                  sep = ""))
+cmd    <- with(metadataAssemblies,
+               paste("cd ", makerRnd1_OutputPath, " && ",
+                     paste(" awk '{ if ", '($2 == "est2genome") print $0 }', "'", sep = ""),
+                     " ", paste(SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""), 
+                     " > ", paste(SppAbbrv, "_rnd1.all.maker.est2genome.gff3", sep = ""),
+                     sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 
 # Protein alignments:
 prefix2 <- "maker_rnd2_protein_evidence"
-cmd <- with(metadataAssemblies,
-            paste("cd ", makerRnd1_OutputPath, " && ",
-                  paste(" awk '{ if ", '($2 == "protein2genome") print $0 }', "'", sep = ""),
-                  " ", paste(SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""), 
-                  " > ", paste(SppAbbrv, "_rnd1.all.maker.protein2genome.gff3", sep = ""),
-                  sep = ""))
+cmd     <- with(metadataAssemblies,
+                paste("cd ", makerRnd1_OutputPath, " && ",
+                      paste(" awk '{ if ", '($2 == "protein2genome") print $0 }', "'", sep = ""),
+                      " ", paste(SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""), 
+                      " > ", paste(SppAbbrv, "_rnd1.all.maker.protein2genome.gff3", sep = ""),
+                      sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix2, suffix)
 
 # Repeat alignments:
 prefix3 <- "maker_rnd2_repeat_evidence"
-cmd <- with(metadataAssemblies,
-            paste("cd ", makerRnd1_OutputPath, " && ",
-                  paste(" awk '{ if ", '($2 ~ "repeat") print $0 }', "'", sep = ""),
-                  " ", paste(SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""), 
-                  " > ", paste(SppAbbrv, "_rnd1.all.maker.repeats.gff3", sep = ""),
-                  sep = ""))
+cmd     <- with(metadataAssemblies,
+                paste("cd ", makerRnd1_OutputPath, " && ",
+                      paste(" awk '{ if ", '($2 ~ "repeat") print $0 }', "'", sep = ""),
+                      " ", paste(SppAbbrv, "_rnd1.all.maker.noseq.gff3", sep = ""), 
+                      " > ", paste(SppAbbrv, "_rnd1.all.maker.repeats.gff3", sep = ""),
+                      sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix3, suffix)
 ```
 
@@ -993,11 +989,11 @@ metadataAssemblies$maker_rnd2_path <- paste(metadataAssemblies$RepeatDBPath, "ma
 **Generate the MAKER control files for the second round of MAKER:**
 ```{r}
 prefix <- "maker_rnd2_CTL"
-cmd <- with(metadataAssemblies, paste("cd ", maker_rnd2_path, " && ", makerPath, " -CTL ", sep = ""))
+cmd    <- with(metadataAssemblies, paste("cd ", maker_rnd2_path, " && ", makerPath, " -CTL ", sep = ""))
 
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 metadataAssemblies$makerRnd2_CTL_optsPath <- paste(metadataAssemblies$maker_rnd2_path, "maker_opts.ctl", sep = "")
-metadataAssemblies$makerRnd2_CTL_exePath <- paste(metadataAssemblies$maker_rnd2_path, "maker_exe.ctl", sep = "")
+metadataAssemblies$makerRnd2_CTL_exePath  <- paste(metadataAssemblies$maker_rnd2_path, "maker_exe.ctl", sep = "")
 ```
 
 **To remove the output files after you are done:**
@@ -1033,14 +1029,14 @@ cmd <- with(metadataAssemblies,
 sapply(cmd, function(x) system(x))
 
 # I also modified the maker_exe.ctl with the local path to tRNAscan:
-pattern <- paste("tRNAscan-SE=", pathtRNA_scanBioC, sep = "")
+pattern    <- paste("tRNAscan-SE=", pathtRNA_scanBioC, sep = "")
 newPattern <- paste("tRNAscan-SE=", pathtRNA_scan, sep = "")
-cmd <- with(metadataAssemblies, paste("/opt/rocks/bin/replace ", pattern, " ", newPattern,
-                                      " -- ", makerRnd2_CTL_exePath, sep = ""))
+cmd        <- with(metadataAssemblies, paste("/opt/rocks/bin/replace ", pattern, " ", newPattern,
+                                             " -- ", makerRnd2_CTL_exePath, sep = ""))
 sapply(cmd, function(x) system(x))
 
 # Edit Genome paths:
-pattern <- "genome= "
+pattern    <- "genome= "
 newPattern <- paste("genome=", metadataAssemblies$FixedNewAssemName, sep = "")
 for(i in 1:nrow(metadataAssemblies)){
     makerOptsGenRepl(metadataAssemblies$makerRnd2_CTL_optsPath[i], pattern, newPattern[i])}
@@ -1070,26 +1066,26 @@ RemoveQsubTempFiles(sharedPathAn, prefix)
 metadataAssemblies$makerRnd2_OutputPath <- paste(metadataAssemblies$maker_rnd2_path, metadataAssemblies$SppAbbrv, "_rnd2.maker.output/", sep = "")
 
 # GFF with the sequences:
-prefix <- "round2_mergeGFF3_maker_all"
-cmd <- with(metadataAssemblies,
-            paste("cd ", makerRnd2_OutputPath, " && ", makerGFF3merge, " -s -d ",
-                  paste(makerRnd2_OutputPath, SppAbbrv, "_rnd2_master_datastore_index.log", sep = ""),
-                  " > ", paste(makerRnd2_OutputPath, SppAbbrv, "_rnd2.all.maker.gff3", sep = ""), sep = ""))
-suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+prefix  <- "round2_mergeGFF3_maker_all"
+cmd     <- with(metadataAssemblies,
+                paste("cd ", makerRnd2_OutputPath, " && ", makerGFF3merge, " -s -d ",
+                      paste(makerRnd2_OutputPath, SppAbbrv, "_rnd2_master_datastore_index.log", sep = ""),
+                      " > ", paste(makerRnd2_OutputPath, SppAbbrv, "_rnd2.all.maker.gff3", sep = ""), sep = ""))
+suffix  <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 
 # Collect all the fastas:
 prefix2 <- "round2_fastaMerge_maker"
-cmd <- with(metadataAssemblies,
-            paste("cd ", makerRnd2_OutputPath, " && ", makerFastamerge, " -d ",
-                  paste(makerRnd2_OutputPath, SppAbbrv, "_rnd2_master_datastore_index.log", sep = ""), sep = ""))
-suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix2, suffix)
+cmd     <- with(metadataAssemblies,
+                paste("cd ", makerRnd2_OutputPath, " && ", makerFastamerge, " -d ",
+                      paste(makerRnd2_OutputPath, SppAbbrv, "_rnd2_master_datastore_index.log", sep = ""), sep = ""))
+suffix  <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix2, suffix)
 
 # GFF without the sequences:
 prefix3 <- "round2_mergeGFF3_maker_all_noseq"
-cmd <- with(metadataAssemblies,
-            paste("cd ", makerRnd2_OutputPath, " && ", makerGFF3merge, " -n -s -d ",
-                  paste(makerRnd2_OutputPath, SppAbbrv, "_rnd2_master_datastore_index.log", sep = ""),
-                  " > ", paste(makerRnd2_OutputPath, SppAbbrv, "_rnd2.all.maker.noseq.gff3", sep = ""), sep = ""))
+cmd     <- with(metadataAssemblies,
+                paste("cd ", makerRnd2_OutputPath, " && ", makerGFF3merge, " -n -s -d ",
+                      paste(makerRnd2_OutputPath, SppAbbrv, "_rnd2_master_datastore_index.log", sep = ""),
+                      " > ", paste(makerRnd2_OutputPath, SppAbbrv, "_rnd2.all.maker.noseq.gff3", sep = ""), sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix3, suffix)
 ```
 
@@ -1110,9 +1106,9 @@ for(k in 1:nrow(metadataAssemblies)){
 metadataAssemblies$snapRnd1MakerRnd2Path <- paste(metadataAssemblies$snapMakerRnd2Path, "round1/", sep = "")
 
 prefix <- "round2_snapMaker2zff"
-cmd <- with(metadataAssemblies,
-            paste("cd ", snapRnd1MakerRnd2Path, " && ", maker2zffPath, " -x 0.25 -l 50 -c 0 -e 0 -o 0 -d ", 
-                  paste(makerRnd2_OutputPath, SppAbbrv, "_rnd2_master_datastore_index.log", sep = ""), sep = ""))
+cmd    <- with(metadataAssemblies,
+               paste("cd ", snapRnd1MakerRnd2Path, " && ", maker2zffPath, " -x 0.25 -l 50 -c 0 -e 0 -o 0 -d ", 
+                     paste(makerRnd2_OutputPath, SppAbbrv, "_rnd2_master_datastore_index.log", sep = ""), sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
@@ -1137,17 +1133,17 @@ sapply(cmd, function(x) system(x))
 
 **Gather some stats and validate:**
 ```{r}
-prefix <- "round2_fathom_stats"
-cmd    <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ", fathomPath, " ", 
+prefix  <- "round2_fathom_stats"
+cmd     <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ", fathomPath, " ", 
                                       paste(SppAbbrv, "_rnd2.zff.ann", sep = ""), " ", paste(SppAbbrv, "_rnd2.zff.dna", sep = ""),
                                       " -gene-stats > gene-stats.log 2>&1 ", sep = ""))
-suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+suffix  <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 
 prefix2 <- "round2_fathom_validate"
-cmd2   <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ", fathomPath, " ", 
+cmd2    <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ", fathomPath, " ", 
                                       paste(SppAbbrv, "_rnd2.zff.ann", sep = ""), " ", paste(SppAbbrv, "_rnd2.zff.dna", sep = ""),
                                       " -validate > validate.log 2>&1 ", sep = ""))
-suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
+suffix  <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 ```
 
 **To remove the output files after you are done:**
@@ -1174,7 +1170,7 @@ RemoveQsubTempFiles(sharedPathAn, prefix)
 prefix2 <- "round2_fathom_export"
 cmd2    <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ",
                    fathomPath, " uni.ann uni.dna -export 1000 -plus > uni-plus.log 2>&1 ", sep = ""))
-suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
+suffix  <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 ```
 
 **To remove the output files after you are done:**
@@ -1201,15 +1197,16 @@ metadataAssemblies$rnd2_AugTrain <- paste(metadataAssemblies$maker_rnd2_path, "r
 ```{r}
 prefix <- "round2_Augustus_zff2gbk"
 
-cmd <- with(metadataAssemblies, 
-            paste("cd ", rnd2_AugTrain, " && ", zff2augGbkPath, 
-                  " ", paste(snapRnd1MakerRnd2Path, "export.ann", sep = ""),
-                  " ", paste(snapRnd1MakerRnd2Path, "export.dna", sep = ""),
-                  " > ", SppAbbrv, ".train.gb",
-                  sep = ""))
+cmd    <- with(metadataAssemblies, 
+               paste("cd ", rnd2_AugTrain, " && ", zff2augGbkPath, 
+                     " ", paste(snapRnd1MakerRnd2Path, "export.ann", sep = ""),
+                     " ", paste(snapRnd1MakerRnd2Path, "export.dna", sep = ""),
+                     " > ", SppAbbrv, ".train.gb",
+                     sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
-metadataAssemblies$rnd2AugTrainGB <- paste(metadataAssemblies$rnd2_AugTrain, metadataAssemblies$SppAbbrv,
-                                           ".train.gb", sep = "")
+
+metadataAssemblies$rnd2AugTrainGB     <- paste(metadataAssemblies$SppAbbrv, ".train.gb", sep = "")
+metadataAssemblies$rnd2AugTrainGBpath <- paste(metadataAssemblies$rnd2_AugTrain, metadataAssemblies$rnd2AugTrainGB, sep = "")
 ```
 
 **To remove the output files after you are done:**
@@ -1219,13 +1216,123 @@ RemoveQsubTempFiles(sharedPathAn, prefix)
 
 Not sure of the following steps, so they are test and need to be reviewed. They follow the steps
 outlined in https://vcru.wisc.edu/simonlab/bioinformatics/programs/augustus/docs/tutorial2015/training.html.  
-**Randomly split the set of annotated sequences in a training and a test set:**
+**Randomly split the set of annotated sequences in a training and a test set:**  
+In order for the test accuracy to be statistically meaningful the test set should also be large enough (100-200 genes). 
+We need to split the set of gene structures really randomly! Do not just take the first and the last part of the file 
+as then the test set is unlikely to be representative. We can achieve this with the randomSplit.pl script that comes
+with the Augustus package. 
 ```{r}
+prefix <- "round2_Aug_randomSplit"
 
+cmd    <- with(metadataAssemblies,
+               paste("cd ", rnd2_AugTrain, " && ", randomSplitPath, " ", rnd2AugTrainGB, " 100 ", sep = ""))
 
-# randomSplit.pl genes.gb 100
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
+**To remove the output files after you are done:**
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+__**Make a meta parameters file for our species.**__  
+We call parameters like the size of the window of the splice site models and the order of the Markov model 
+meta parameters, in contrast to parameters like the distribution of splice site patterns, the k-mer probabilities 
+of coding and noncoding regions. There are a few dozen meta parameters but many thousands of parameters. The meta 
+parameters determine how the parameters are calculated. 
+  
+**Create the files for training our species from a template:**  
+new_species.pl uses the environment variable AUGUSTUS_CONFIG_PATH to determine the directory in which 
+AUGUSTUS stores the species parameters.
+```{r}
+prefix <- "round2_AugTrainingFiles"
+cmd    <- with(metadataAssemblies,
+               paste("cd ", rnd2_AugTrain, " && ",
+                     newSpeciesPath, " --species=", ScientificName, "_AugRnd2", sep = ""))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+
+**To remove the output files after you are done:**
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+**Perform an inital training run.**  
+We will use the training set of gene structures, genes.train.gb, to train Augustus for our species. Etraining will create/update
+parameter files for exon, intron, and intergenic regions in the $AUGUSTUS_CONFIG_PATH/species/ourSpecies.
+```{r}
+prefix <- "round2_AugEtraining"
+cmd    <- with(metadataAssemblies,
+               paste("cd ", rnd2_AugTrain, " && ", etrainBioCPath,
+                     " --species=", ScientificName, "_AugRnd2 ", rnd2AugTrainGB, sep = ""))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+
+**To remove the output files after you are done:**
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+**Test the prediction accuracy of the newly-created Augustus training files.**  
+We can test the prediction accuracy of our new Augustus training files on the test set we generated when we used
+randomSplit.pl.
+```{r}
+prefix <- "round2_AugTrain_InitTest"
+cmd    <- with(metadataAssemblies,
+               paste("cd ", rnd2_AugTrain, " && ", augustBioCPath, " --species=", ScientificName, "_AugRnd2 ",
+                     rnd2AugTrainGB, ".test | tee firsttest.out", sep = ""))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+
+**To remove the output files after you are done:**
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+**Checking the Evaluation Results.**  
+You can see the evaluation summary in the firsttest.out file by typing the following in the command line:  
+  
+**_$ grep -A 22 Evaluation firsttest.out_**  
+  
+You should see an output like the following:  
+  
+*******      Evaluation of gene prediction     *******  
+
+---------------------------------------------\  
+                 | sensitivity | specificity |  
+---------------------------------------------|  
+nucleotide level |       0.873 |       0.626 |  
+---------------------------------------------/  
+  
+----------------------------------------------------------------------------------------------------------\  
+           |  #pred |  #anno |      |    FP = false pos. |    FN = false neg. |             |             |  
+           | total/ | total/ |   TP |--------------------|--------------------| sensitivity | specificity |  
+           | unique | unique |      | part | ovlp | wrng | part | ovlp | wrng |             |             |  
+----------------------------------------------------------------------------------------------------------|  
+           |        |        |      |                253 |                101 |             |             |  
+exon level |    484 |    332 |  231 | ------------------ | ------------------ |       0.696 |       0.477 |  
+           |    484 |    332 |      |   35 |    0 |  218 |   36 |    0 |   65 |             |             |  
+----------------------------------------------------------------------------------------------------------/  
+  
+----------------------------------------------------------------------------\  
+transcript | #pred | #anno |   TP |   FP |   FN | sensitivity | specificity |  
+----------------------------------------------------------------------------|  
+gene level |   156 |   100 |   47 |  109 |   53 |        0.47 |       0.301 |  
+----------------------------------------------------------------------------/  
+  
+These numbers mean, for example, that:  
+of the 100 genes 47 were predicted exactly  
+69.6% of the exons were predicted exactly  
+47.7% of the predicted exons were exactly as in the test set.  
+  
+I noticed that the predictions were great for my *Lachnellula* species, with the exception of *Lachnellula willkommii*, 
+which had lower prediction accuracy.  
+  
+__**Optimize the Augustus prediction accuracy**__  
+We can optimize the Augustus prediction accuracy by running the optimize_augustus.pl script that comes with the Augustus
+package. This script adjusts the meta parameters in the *_parameters.cfg file. Note that this script will alternatingly
+use augustus and etraining programs, and may take a long time to complete. It can increase the prediction accuracy by
+a few percentage points.  
 
 # We've now completed the 2nd round of MAKER. 
 # We can see how things are going by evaluating the gene models we have so far:
@@ -1237,7 +1344,6 @@ cmd <- with(metadataAssemblies,
                   " | awk '{ if ($3 ==", '"gene") print $0}', 
                   "' | awk '{ sum += ($5 - $4) } END { print NR, sum / NR }'", sep = ""))
 
-cmd[1]
 sapply(cmd, function(x) system(x))
 ```
 
