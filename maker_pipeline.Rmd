@@ -1299,7 +1299,7 @@ You should see an output like the following:
 *******      Evaluation of gene prediction     *******  
   
 |              | sensitivity | specificity |     |                     |                     |             |             |  
-|:-------------|:-----------:|:-----------:|:---:|:-------------------:|:-------------------:|:-----------:|:-----------:|      
+|:-------------|:-----------:|:-----------:|:---:|:--------------------:|:-------------------:|:-----------:|:-----------:|      
 |nucleotide level| 0.873       | 0.626       |     |                     |                     |             |             |  
 |                | #predicted  | #annotated  | TP  | FP = false pos.     | FN = false neg.     | sensitivity | specificity |  
 |exon level      | 484         | 332         | 231 | part : ovlp : wrng  | part : ovlp : wrng  | 0.696       | 0.477       |  
