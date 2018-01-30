@@ -1298,27 +1298,27 @@ You should see an output like the following:
   
 *******      Evaluation of gene prediction     *******  
 
----------------------------------------------\  
-                 | sensitivity | specificity |  
----------------------------------------------|  
-nucleotide level |       0.873 |       0.626 |  
----------------------------------------------/  
+---------------------------------------------- 
+-----------------| sensitivity | specificity  
+-----------------|-------------|-------------  
+nucleotide level |       0.873 |       0.626   
+---------------------------------------------  
   
-----------------------------------------------------------------------------------------------------------\  
-           |  #pred |  #anno |      |    FP = false pos. |    FN = false neg. |             |             |  
-           | total/ | total/ |   TP |--------------------|--------------------| sensitivity | specificity |  
-           | unique | unique |      | part | ovlp | wrng | part | ovlp | wrng |             |             |  
-----------------------------------------------------------------------------------------------------------|  
-           |        |        |      |                253 |                101 |             |             |  
-exon level |    484 |    332 |  231 | ------------------ | ------------------ |       0.696 |       0.477 |  
-           |    484 |    332 |      |   35 |    0 |  218 |   36 |    0 |   65 |             |             |  
-----------------------------------------------------------------------------------------------------------/  
+----------------------------------------------------------------------------------------------------------  
+-----------|  #pred |  #anno |------|    FP = false pos. |    FN = false neg. |-------------|-------------  
+-----------| total/ | total/ |   TP |------|------|------|------|------|------| sensitivity | specificity   
+-----------| unique | unique |      | part | ovlp | wrng | part | ovlp | wrng |             |               
+----------------------------------------------------------------------------------------------------------  
+-----------|--------|--------|------|                253 |                101 |-------------|-------------    
+exon level |    484 |    332 |  231 | -----|------|----- | -----|------|----- |       0.696 |       0.477   
+-----------|    484 |    332 |      |   35 |    0 |  218 |   36 |    0 |   65 |             |               
+----------------------------------------------------------------------------------------------------------  
   
-----------------------------------------------------------------------------\  
-transcript | #pred | #anno |   TP |   FP |   FN | sensitivity | specificity |  
-----------------------------------------------------------------------------|  
-gene level |   156 |   100 |   47 |  109 |   53 |        0.47 |       0.301 |  
-----------------------------------------------------------------------------/  
+----------------------------------------------------------------------------  
+transcript | #pred | #anno |   TP |   FP |   FN | sensitivity | specificity   
+-----------|-------|-------|------|------|------|-------------|-------------  
+gene level |   156 |   100 |   47 |  109 |   53 |        0.47 |       0.301   
+----------------------------------------------------------------------------  
   
 These numbers mean, for example, that:  
 of the 100 genes 47 were predicted exactly  
@@ -1333,6 +1333,36 @@ We can optimize the Augustus prediction accuracy by running the optimize_augustu
 package. This script adjusts the meta parameters in the *_parameters.cfg file. Note that this script will alternatingly
 use augustus and etraining programs, and may take a long time to complete. It can increase the prediction accuracy by
 a few percentage points.  
+```{r}
+prefix <- "round2_AugTrain_Optimize"
+node   <- 12
+cmd    <- with(metadataAssemblies,
+               paste("cd ", rnd2_AugTrain, " && ", optimAugustPath, " --cpus=", node, 
+                     " --species=", ScientificName, "_AugRnd2 ", rnd2AugTrainGB, ".train", sep = ""))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
+```
+*** Over here!!! 29Jan2018
+**To remove the output files after you are done:**
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+__**Re-train Augustus using the new meta parameters it has set**__  
+Once the optimize_augustus.pl has finished (or been interrupted), we need to re-train Augustus with the newly
+optimized meta parameters.  
+```{r}
+prefix <- "round2_AugEtraining_2"
+cmd    <- with(metadataAssemblies,
+               paste("cd ", rnd2_AugTrain, " && ", etrainBioCPath,
+                     " --species=", ScientificName, "_AugRnd2 ", rnd2AugTrainGB, sep = ""))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+
+**To remove the output files after you are done:**
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
 
 # We've now completed the 2nd round of MAKER. 
 # We can see how things are going by evaluating the gene models we have so far:
