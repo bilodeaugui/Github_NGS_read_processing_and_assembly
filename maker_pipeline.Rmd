@@ -46,6 +46,7 @@ aedCDFgenePath  <- "/home/CFIA-ACIA/girouxeml/prog/scripts_pl/AED_cdf_generator.
 augustBioCPath  <- "/isilon/biodiversity/pipelines/maker-2.10/augustus.2.7/bin/augustus"
 augEvalBioCPath <- "/isilon/biodiversity/pipelines/maker-2.10/augustus.2.7/bin/augustus"
 bedtoolsPath    <- "/opt/bio/BEDTools/bin/bedtools"
+blastallPath    <- "/opt/bio/ncbi/bin/blastall"
 buscoPath       <- "/home/CFIA-ACIA/girouxeml/prog/busco/scripts/run_BUSCO.py"
 buscoPezDataSet <- "/home/CFIA-ACIA/girouxeml/prog/busco_datasets/pezizomycotina_odb9/"
 etrainBioCPath  <- "/isilon/biodiversity/pipelines/maker-2.10/augustus.2.7/bin/etraining"
@@ -53,8 +54,15 @@ fathomPath      <- "/home/CFIA-ACIA/girouxeml/prog/snap/fathom"
 forgePath       <- "/home/CFIA-ACIA/girouxeml/prog/snap/forge"
 genemarkPath    <- "/home/CFIA-ACIA/girouxeml/prog/genemark-es/gmes_petap.pl"
 hmmAssemPath    <- "/home/CFIA-ACIA/girouxeml/prog/snap/hmm-assembler.pl"
+interproPath    <- "/home/CFIA-ACIA/girouxeml/prog/my_interproscan/interproscan-5.24-63.0/interproscan.sh"
+makerDatMapPath <- paste(scriptsPath, "map_data_ids.pl", sep = "")
 makerFastamerge <- "/home/CFIA-ACIA/girouxeml/prog/maker/bin/fasta_merge"
-makerGFF3merge  <- "/home/CFIA-ACIA/girouxeml/prog/maker/bin/gff3_merge"
+makerFuncGffPath <- paste(scriptsPath, "maker_functional_gff.pl", sep = "")
+makerGFF3merge   <- "/home/CFIA-ACIA/girouxeml/prog/maker/bin/gff3_merge"
+makerIPRupdatePath <- paste(scriptsPath, "ipr_update_gff.pl", sep = "")
+makerMapFastaPath  <- paste(scriptsPath, "map_fasta_ids.pl", sep = "")
+makerMapGffPath <- paste(scriptsPath, "map_gff_ids.pl", sep = "")
+makerMapPath    <- paste(scriptsPath, "maker_map_ids.pl", sep = "")
 makerPath       <- "/home/CFIA-ACIA/girouxeml/prog/maker/bin/maker"
 maker2zffPath   <- "/home/CFIA-ACIA/girouxeml/prog/maker/bin/maker2zff"
 newSpeciesPath  <- "/isilon/biodiversity/pipelines/maker-2.10/augustus.2.7/scripts/new_species.pl"
@@ -66,7 +74,9 @@ randomSplitPath <- "/isilon/biodiversity/pipelines/maker-2.10/augustus.2.7/scrip
 repMaskerPath   <- "/home/CFIA-ACIA/girouxeml/prog/RepeatMasker/RepeatMasker"
 repModBuildDBPath  <- "/home/CFIA-ACIA/girouxeml/prog/RepeatModeler-open-1.0.11/BuildDatabase"
 repModlerPath <- "/home/CFIA-ACIA/girouxeml/prog/RepeatModeler-open-1.0.11/RepeatModeler"
+scriptsPath   <- "/home/CFIA-ACIA/girouxeml/prog/scripts_pl/"
 rmOutToGFF3Path <- "/home/CFIA-ACIA/girouxeml/prog/RepeatMasker/util/rmOutToGFF3.pl"
+uniProtSwissPDB <- "/home/CFIA-ACIA/girouxeml/prog/databases/uniprot_sprot.fasta"
 zff2augGbkPath  <- "/home/CFIA-ACIA/girouxeml/prog/scripts_pl/zff2augustus_gbk.pl"
 ```
 
@@ -279,11 +289,11 @@ https://gist.github.com/darencard/bb1001ac1532dd4225b030cf0cd61ce2
   
 #### 1-D. Full Repeat Annotation with RepeatMasker:   
   
-**__Full Repeat Annotation:__**  
+**Full Repeat Annotation:**  
 Depending on the species, the de novo library can be fed right into MAKER, however, based on the very thorough example provided 
 by https://gist.github.com/darencard/bb1001ac1532dd4225b030cf0cd61ce2, we'll be doing a more complex repeat identification.
   
-__**EMBL repeat library masking:**__  
+**EMBL repeat library masking:**    
 First, we mask using a currated library to overcome a previously-identified issue with the Repbase annotation. 
 I used the known library from repeatmasker.lib.EMBL, which I converted to fasta format using RepeatMasker/util/buildRMLibFromEMBL.pl script.
 Then we pass the species genome assemblies through the RepeatMaskerLib.fasta using RepeatMasker.
@@ -301,7 +311,7 @@ cmd    <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```
 
-__**Known repeat library masking:**__  
+**Known repeat library masking:**    
 Then the masked FASTA from this search can be used as input for the next search. I also normally 
 rename the outputs after each round so they are more representative of what they contain. Do 2 rounds, 
 using the known and unknown *Lachnellula* repeat libraries created, split, so that the known elements 
@@ -321,7 +331,7 @@ cmd    <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```
 
-__**Unknown repeat library masking:**__  
+**Unknown repeat library masking:**    
 Run RepeatMasker with unknown repeat lib, using as input the unknown masked output. Note, make sure to use the unknown lib
 that was passed through NR, RNA, and BLAST checks to remove repeats that were actually part of genes or functional RNAs.
 ```{r}
@@ -424,7 +434,7 @@ cmd    <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
-__**Reformat to work with MAKER:**__   
+**Reformat to work with MAKER:**   
   
 **Note:**  
 I can't seem to be able to generate the commands I want for this one. The commands are in the chunk below, and 
@@ -784,7 +794,7 @@ RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
 #### 4-B. Training Augustus using BUSCO.  
-**__Augustus__**  
+**Augustus**  
 Training Augustus is a more laborious process. Luckily, the recent release of BUSCO provides a nice pipeline 
 for performing the training, while giving you an idea of how good your annotation already is (If you don't want 
 to go this route, there are scripts provided with Augustus to perform the training). First, the Parallel::ForkManager 
@@ -1217,11 +1227,62 @@ suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
-### 6. __Training Augustus - Round 2__  
+### We've now completed the 2nd round of MAKER.   
+#### 5-F. Evaluate the gene models.  
+We've now completed the 2nd round of MAKER and should evaluate the gene models we have so far:  
+
+**i. Count the number of gene models and the gene lengths:**    
+I manually recorded the output values to a summary BUSCO excel file. Welcome to ideas on how to capture the output.
+```{r}
+cmd <- with(metadataAssemblies, 
+            paste("cd ", makerRnd2_OutputPath, " && ", " cat ", SppAbbrv, "_rnd2.all.maker.gff3 ", 
+                  " | awk '{ if ($3 ==", '"gene") print $0}', 
+                  "' | awk '{ sum += ($5 - $4) } END { print NR, sum / NR }'", sep = ""))
+
+sapply(cmd, function(x) system(x))
+```
+
+**ii. Visualize the AED distribution:**  
+AED ranges from 0 to 1 and quantifies the confidence in a gene model 
+based on empirical evidence. Basically, the lower the AED, the better a gene model is likely to be. Ideally, 
+95% or more of the gene models will have an AED of 0.5 or better in the case of good assemblies. You can use 
+this AED_cdf_generator.pl script to help with this.  
+I have just recorded the fraction at 0.5 into my summary excel table. Open to ideas on how to capture it better. 
+```{r}
+cmd <- with(metadataAssemblies, 
+            paste("cd ", makerRnd2_OutputPath, " && ", " perl ", aedCDFgenePath, 
+                  " -b 0.025 ", SppAbbrv, "_rnd2.all.maker.gff3", sep = "")) 
+cmd[1]
+sapply(cmd, function(x) system(x))
+```
+
+**iii. Run BUSCO using the Augustus species HMM to look at the results:**  
+We can run BUSCO using the Augustus species HMM we obtained, without having to training Augustus. Only include the 
+transcript sequences, and not the 1000 bp on each side, and be sure to take the best (i.e., longest) transcript for
+each gene so we aren't artificially seeding duplicates. We could also run it on the best protein sequence per gene
+instead. 
+```{r}
+prefix <- "round2_eval_with_Busco"
+node   <- 8
+cmd    <- with(metadataAssemblies,
+               paste("cd ", makerRnd2_OutputPath, " && ",
+                     "python ", buscoPath, " -i ", paste(SppAbbrv, "_rnd2.all.maker.transcripts.fasta", sep = ""),
+                     " -o annotation_eval ", " -c ", node,
+                     " -l ", buscoPezDataSet, " -m transcriptome -sp ", ScientificName, " -z --augustus_parameters='--progress=true'",
+                     " --restart ", 
+                     " --force ", 
+                     sep = ""))
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
+# Note, if the run fails, restart the run with the following "--restart", it will continue from where it left off. However, check the 
+# config.ini file in ~/prog/busco/config/ to make sure that restart is set to True, and that you adjust to the correct cpus number.
+```
+
+### 6. Training Augustus - Round 2  
 We won't be using BUSCO to train Augustus the second time since as there is a bias in the models it
-produces for conserved genes that tend to be short and intron poor. To avoid this bias in the second round, we use a broad selection of gene models instead. After using the maker2zff script and then fathom to generate the 
-export.ann and export.dna files, we will use a script that converts the zff files to GenBank format to 
-train Augustus using the zff2augustus_gbk.pl script available at:  
+produces for conserved genes that tend to be short and intron poor. To avoid this bias in the second round, we use a broad selection 
+of gene models instead. After using the maker2zff script and then fathom to generate the export.ann and export.dna files, we will use 
+a script that converts the zff files to GenBank format to train Augustus using the zff2augustus_gbk.pl script available at:  
 https://github.com/hyphaltip/genome-scripts/blob/master/gene_prediction/zff2augustus_gbk.pl.  
   
 #### 6-A. Set up the training directories:
@@ -1276,7 +1337,7 @@ RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
 #### 6-D. Set up the meta parameters file and create the species training files.  
-__**Make a meta parameters file for our species.**__  
+**Make a meta parameters file for our species.**  
 We call parameters like the size of the window of the splice site models and the order of the Markov model 
 meta parameters, in contrast to parameters like the distribution of splice site patterns, the k-mer probabilities 
 of coding and noncoding regions. There are a few dozen meta parameters but many thousands of parameters. The meta 
@@ -1495,6 +1556,7 @@ for(i in 1:nrow(metadataAssemblies)){
     makerOptsGenRepl(metadataAssemblies$makerRnd3_CTL_optsPath[i], pattern, newPattern[i])}
 ```
 
+#### 7-E. Run MAKER round 3.
 **Then we can run MAKER, substituting this new control file, and summarize the output, as we did before.**
 ```{r}
 prefix <- "maker_round_3_run"
@@ -1508,12 +1570,13 @@ cmd    <- with(metadataAssemblies,
                      " -cpus ", node, sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```
-*** Over here!!! 31Jan2018
+
 **To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
+#### 7-F. Assemble the MAKER round 3 GFF and FASTA outputs.  
 **We conclude by assembling together the GFF and FASTA outputs.**
 ```{r}
 metadataAssemblies$makerRnd3_OutputPath <- paste(metadataAssemblies$maker_rnd3_path, metadataAssemblies$SppAbbrv, "_rnd3.maker.output/", sep = "")
@@ -1547,21 +1610,21 @@ suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix3, suffix)
 RemoveQsubTempFiles(sharedPathAn, prefix); RemoveQsubTempFiles(sharedPathAn, prefix2); RemoveQsubTempFiles(sharedPathAn, prefix3)
 ```
 
-**Export confident gene models from round 1 of MAKER using maker2zff:**  
+**Export confident gene models from round 3 of MAKER using maker2zff:**  
 For determining which genes are High Confidence for Retraining:
 ```{r}
 for(k in 1:nrow(metadataAssemblies)){
-    dir.create(paste(metadataAssemblies$maker_rnd2_path[k], "snap", sep = ""), showWarnings = TRUE, recursive = FALSE)}
-metadataAssemblies$snapMakerRnd2Path <- paste(metadataAssemblies$maker_rnd2_path, "snap/", sep = "")
+    dir.create(paste(metadataAssemblies$maker_rnd3_path[k], "snap", sep = ""), showWarnings = TRUE, recursive = FALSE)}
+metadataAssemblies$snapMakerRnd3Path <- paste(metadataAssemblies$maker_rnd3_path, "snap/", sep = "")
 
 for(k in 1:nrow(metadataAssemblies)){
-    dir.create(paste(metadataAssemblies$snapMakerRnd2Path[k], "round1", sep = ""), showWarnings = TRUE, recursive = FALSE)}
-metadataAssemblies$snapRnd1MakerRnd2Path <- paste(metadataAssemblies$snapMakerRnd2Path, "round1/", sep = "")
+    dir.create(paste(metadataAssemblies$snapMakerRnd3Path[k], "round1", sep = ""), showWarnings = TRUE, recursive = FALSE)}
+metadataAssemblies$snapRnd1MakerRnd3Path <- paste(metadataAssemblies$snapMakerRnd3Path, "round1/", sep = "")
 
-prefix <- "round2_snapMaker2zff"
+prefix <- "round3_snapMaker2zff"
 cmd    <- with(metadataAssemblies,
-               paste("cd ", snapRnd1MakerRnd2Path, " && ", maker2zffPath, " -x 0.25 -l 50 -c 0 -e 0 -o 0 -d ", 
-                     paste(makerRnd2_OutputPath, SppAbbrv, "_rnd2_master_datastore_index.log", sep = ""), sep = ""))
+               paste("cd ", snapRnd1MakerRnd3Path, " && ", maker2zffPath, " -x 0.25 -l 50 -c 0 -e 0 -o 0 -d ", 
+                     paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3_master_datastore_index.log", sep = ""), sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
 
@@ -1572,29 +1635,29 @@ RemoveQsubTempFiles(sharedPathAn, prefix)
 
 **Take a quick look at number of sequences in the genome.dna file:**
 ```{r}
-cmd <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ", 'grep ">" genome.dna | wc -l ', sep = ""))
+cmd <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd3Path, " && ", 'grep ">" genome.dna | wc -l ', sep = ""))
 sapply(cmd, function(x) system(x))
 
-cmd <- with(metadataAssemblies, file.rename(paste(snapRnd1MakerRnd2Path, "genome.dna", sep = ""),
-                                            paste(snapRnd1MakerRnd2Path, SppAbbrv, "_rnd2.zff.dna", sep = "")))
+cmd <- with(metadataAssemblies, file.rename(paste(snapRnd1MakerRnd3Path, "genome.dna", sep = ""),
+                                            paste(snapRnd1MakerRnd3Path, SppAbbrv, "_rnd3.zff.dna", sep = "")))
 sapply(cmd, function(x) system(x))
 
-cmd <- with(metadataAssemblies, file.rename(paste(snapRnd1MakerRnd2Path, "genome.ann", sep = ""),
-                                            paste(snapRnd1MakerRnd2Path, SppAbbrv, "_rnd2.zff.ann", sep = "")))
+cmd <- with(metadataAssemblies, file.rename(paste(snapRnd1MakerRnd3Path, "genome.ann", sep = ""),
+                                            paste(snapRnd1MakerRnd3Path, SppAbbrv, "_rnd3.zff.ann", sep = "")))
 sapply(cmd, function(x) system(x))
 ```
 
 **Gather some stats and validate:**
 ```{r}
-prefix  <- "round2_fathom_stats"
-cmd     <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ", fathomPath, " ", 
-                                      paste(SppAbbrv, "_rnd2.zff.ann", sep = ""), " ", paste(SppAbbrv, "_rnd2.zff.dna", sep = ""),
+prefix  <- "round3_fathom_stats"
+cmd     <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd3Path, " && ", fathomPath, " ", 
+                                      paste(SppAbbrv, "_rnd3.zff.ann", sep = ""), " ", paste(SppAbbrv, "_rnd3.zff.dna", sep = ""),
                                       " -gene-stats > gene-stats.log 2>&1 ", sep = ""))
 suffix  <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 
-prefix2 <- "round2_fathom_validate"
-cmd2    <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ", fathomPath, " ", 
-                                      paste(SppAbbrv, "_rnd2.zff.ann", sep = ""), " ", paste(SppAbbrv, "_rnd2.zff.dna", sep = ""),
+prefix2 <- "round3_fathom_validate"
+cmd2    <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd3Path, " && ", fathomPath, " ", 
+                                      paste(SppAbbrv, "_rnd3.zff.ann", sep = ""), " ", paste(SppAbbrv, "_rnd3.zff.dna", sep = ""),
                                       " -validate > validate.log 2>&1 ", sep = ""))
 suffix  <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 ```
@@ -1606,9 +1669,9 @@ RemoveQsubTempFiles(sharedPathAn, prefix); RemoveQsubTempFiles(sharedPathAn, pre
 
 **Collect the training sequences and annotations, plus 1000 surrounding bp for training**
 ```{r}
-prefix <- "round2_fathom_categorize"
-cmd    <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ", fathomPath, " ", 
-                                      paste(SppAbbrv, "_rnd2.zff.ann", sep = ""), " ", paste(SppAbbrv, "_rnd2.zff.dna", sep = ""),
+prefix <- "round3_fathom_categorize"
+cmd    <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd3Path, " && ", fathomPath, " ", 
+                                      paste(SppAbbrv, "_rnd3.zff.ann", sep = ""), " ", paste(SppAbbrv, "_rnd3.zff.dna", sep = ""),
                                       " -categorize 1000 > categorize.log 2>&1 ", sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 ```
@@ -1620,8 +1683,8 @@ RemoveQsubTempFiles(sharedPathAn, prefix)
 
 **Wait for the categorize run to finish before doing the export, which is next.**
 ```{r}
-prefix2 <- "round2_fathom_export"
-cmd2    <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && ",
+prefix2 <- "round3_fathom_export"
+cmd2    <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd3Path, " && ",
                    fathomPath, " uni.ann uni.dna -export 1000 -plus > uni-plus.log 2>&1 ", sep = ""))
 suffix  <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 ```
@@ -1631,65 +1694,236 @@ suffix  <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
 RemoveQsubTempFiles(sharedPathAn, prefix2)
 ```
 
+### We've now completed the 3rd round of MAKER.   
+#### 7-G. Evaluate the gene models.  
+We've now completed the 3rd round of MAKER and should evaluate the gene models we have so far:  
 
-### We've now completed the 3nd round of MAKER.   
-#### We can see how things are going by evaluating the gene models we have so far:  
-A. Count the number of gene models and the gene lengths:  
+**i. Count the number of gene models and the gene lengths:**    
 I manually recorded the output values to a summary BUSCO excel file. Welcome to ideas on how to capture the output.
 ```{r}
 cmd <- with(metadataAssemblies, 
-            paste("cd ", makerRnd2_OutputPath, " && ", " cat ", SppAbbrv, "_rnd2.all.maker.gff3 ", 
+            paste("cd ", makerRnd3_OutputPath, " && ", " cat ", SppAbbrv, "_rnd3.all.maker.gff3 ", 
                   " | awk '{ if ($3 ==", '"gene") print $0}', 
                   "' | awk '{ sum += ($5 - $4) } END { print NR, sum / NR }'", sep = ""))
 
 sapply(cmd, function(x) system(x))
 ```
 
-B. Visualize the AED distribution. AED ranges from 0 to 1 and quantifies the confidence in a gene model 
-based on empirical evidence. Basically, the lower the AED, the better a gene model is likely to be. Ideally, 
-95% or more of the gene models will have an AED of 0.5 or better in the case of good assemblies. You can use 
-this AED_cdf_generator.pl script to help with this.  
+**ii. Visualize the AED distribution:**   
+AED ranges from 0 to 1 and quantifies the confidence in a gene model based on empirical evidence. Basically, 
+the lower the AED, the better a gene model is likely to be. Ideally, 95% or more of the gene models will have an 
+AED of 0.5 or better in the case of good assemblies. You can use this AED_cdf_generator.pl script to help with this.  
 I have just recorded the fraction at 0.5 into my summary excel table. Open to ideas on how to capture it better. 
 ```{r}
 cmd <- with(metadataAssemblies, 
-            paste("cd ", makerRnd2_OutputPath, " && ", " perl ", aedCDFgenePath, 
-                  " -b 0.025 ", SppAbbrv, "_rnd2.all.maker.gff3", sep = "")) 
-cmd[1]
+            paste("cd ", makerRnd3_OutputPath, " && ", " perl ", aedCDFgenePath, 
+                  " -b 0.025 ", SppAbbrv, "_rnd3.all.maker.gff3", sep = "")) 
 sapply(cmd, function(x) system(x))
 ```
 
-C. Run BUSCO using the Augustus species HMM to look at the results, without training Augustus. Only include the 
+**iii. Run BUSCO using the Augustus species HMM to look at the results:**  
+We can run BUSCO using the Augustus species HMM we obtained, without having to training Augustus. Only include the 
 transcript sequences, and not the 1000 bp on each side, and be sure to take the best (i.e., longest) transcript for
 each gene so we aren't artificially seeding duplicates. We could also run it on the best protein sequence per gene
-instead. 
+instead.  
 ```{r}
-prefix <- "round2_eval_with_Busco"
+prefix <- "round3_eval_with_Busco"
 node   <- 8
 cmd    <- with(metadataAssemblies,
-               paste("cd ", makerRnd2_OutputPath, " && ",
-                     "python ", buscoPath, " -i ", paste(SppAbbrv, "_rnd2.all.maker.transcripts.fasta", sep = ""),
+               paste("cd ", makerRnd3_OutputPath, " && ",
+                     "python ", buscoPath, " -i ", paste(SppAbbrv, "_rnd3.all.maker.transcripts.fasta", sep = ""),
                      " -o annotation_eval ", " -c ", node,
-                     " -l ", buscoPezDataSet, " -m transcriptome -sp ", ScientificName, " -z --augustus_parameters='--progress=true'",
-                     " --restart ", 
-                     " --force ", 
-                     sep = ""))
+                     " -l ", buscoPezDataSet, " -m transcriptome -sp ", ScientificName, "_AugRnd2", " -z --augustus_parameters='--progress=true'",
+                     " --restart  --force ", sep = ""))
 
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 # Note, if the run fails, restart the run with the following "--restart", it will continue from where it left off. However, check the 
 # config.ini file in ~/prog/busco/config/ to make sure that restart is set to True, and that you adjust to the correct cpus number.
 ```
 
-D. Visualise the gene models from Augustus, SNAP, and MAKER, also Genemark-es using a genome browser such as JBrowse.  
-With JBrowse, you can essentially follow this guide to get this started. A helpful resource is this gff2jbrowse.pl script, 
-which automates adding tracks to the browser based on the GFF output of your MAKER run. It is best to use 5-10 longer, gene 
-dense scaffolds and visually inspect them. When SNAP and Augustus are well trained, their models should overlap pretty 
-closely with the final MAKER models. Moreover, there will be spurious hits from SNAP and Augustus, but they are usually short, 
-1-2 exon annotations and don't have empirical support. You'll get a sense of a good annotation with some experience. Also, it 
-is possible SNAP won't produce good results, depending on your organism, which the MAKER folks have pointed out in the 
+D. Visualise the gene models from Augustus, SNAP, and MAKER, also Genemark-es using a genome browser such as JBrowse or Geneious.  
+It is best to use 5-10 longer, gene dense scaffolds and visually inspect them. When SNAP and Augustus are well trained, their models 
+should overlap pretty closely with the final MAKER models. Moreover, there will be spurious hits from SNAP and Augustus, but they are 
+usually short, 1-2 exon annotations and don't have empirical support. You'll get a sense of a good annotation with some experience. 
+Also, it is possible SNAP won't produce good results, depending on your organism, which the MAKER folks have pointed out in the 
 past (Augustus usually does pretty well).
 ```{r}
+for(k in 1:nrow(metadataAssemblies)){
+    dir.create(paste(metadataAssemblies$RepeatDBPath[k], "jbrowse", sep = ""), showWarnings = TRUE, recursive = FALSE)}
+metadataAssemblies$jbrowse <- paste(metadataAssemblies$RepeatDBPath, "jbrowse/", sep = "")
+
+jbrowsePrepRefsSeqsPath <- "/home/CFIA-ACIA/girouxeml/prog/jbrowse/JBrowse-1.12.3/bin/prepare-refseqs.pl"
+
+prefix <-"end_Jbrowse_prepRefSeqs"
+cmd    <- with(metadataAssemblies,
+               paste("cd ", jbrowse, " && ", jbrowsePrepRefsSeqsPath, 
+                     " --gff ", paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3.all.maker_jb.gff3", sep = "")))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 # Have yet to determine quickest way to do this on our cluster.
 ```
+
+**To remove the output files after you are done:**
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+```{r}
+jbrowseFlatfile2json <- "/home/CFIA-ACIA/girouxeml/prog/jbrowse/JBrowse-1.12.3/bin/flatfile-to-json.pl"
+prefix <- "end_Jbrowse_flatfile2json"
+
+cmd <- with(metadataAssemblies,
+            paste("cd ", jbrowse, " && ", jbrowseFlatfile2json, 
+                  "  --gff ", paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3.all.maker_jb.gff3", sep = ""), 
+                  " --trackType CanvasFeatures --trackLabel ", SppAbbrv, 
+                  " --out . ", sep = ""))
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
+```
+
+After running the chunk above, you need to look at the error files created. They will log any problems with contigs whose
+parents aren't found. It means you need to go back to the MAKER round 3 gff files and edit them to remove/fix those problems,
+and then repeat this with the modified gff3 files you generate. Make sure you rename files that you edit so that you don't
+overwrite the original one. Instead of JBrowse, I used Geneious to visualise the annotations, but going through the steps to 
+prepare good GFF files for JBrowse allowed me to identify and fix problems in the GFF3 files.  
+  
+Record the final fixed gff3 files in the metadata table:
+```{r}
+metadataAssemblies$fixed_GFF3 <- paste(metadataAssemblies$makerRnd3_OutputPath, metadataAssemblies$SppAbbrv, "_rnd3.all.maker_jb.gff3", sep = "")
+```
+
+## 8. Prepare tidy versions of the annotations.  
+Rename gene names from gff and other output files for annotations.  
+
+Map ID file:
+```{r}
+prefix <- "post_maker_map_IDs"
+justify = 6
+abrvGene = "G"
+abrvTrans = "T"
+
+cmd <- with(metadataAssemblies,
+            paste("perl ", makerMapPath, " --prefix ", paste(SppAbbrv, "_", sep = ""), 
+                  " --justify ", justify, " --abrv_gene ", abrvGene, " --abrv_tran ", abrvTrans, 
+                  " ", fixed_GFF3, " > ", paste(makerRnd3_OutputPath, SppAbbrv, ".map", sep = "")))
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+
+**To remove the output files after you are done:**
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+Once the names have been changed using maker, in the GFF, they still need to be fixed, so do this 
+using the output modified file.
+In-place replacement of names with Maker scripts:
+GFF and protein fasta files:
+```{r}
+prefix <- "post_maker_cp_gff3"
+cmd <- with(metadataAssemblies, 
+            paste("cp ", fixed_GFF3, paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3.all.maker_jb.renamed.gff3", sep = "")))
+cmd[1]
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+```
+
+**To remove the output files after you are done:**
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+GFF and protein fasta files:
+```{r}
+prefix <- "post_maker_cp_proteinsFasta"
+cmd <- with(metadataAssemblies, 
+            paste("cp ", paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3.all.maker.proteins.fasta", sep = ""), 
+                  " ", paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3.all.maker.proteins.renamed.fasta", sep = "")))
+cmd[1]
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+
+prefix2 <- "post_maker_cp_transcriptsFasta"
+cmd2 <- with(metadataAssemblies, 
+             paste("cp ", paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3.all.maker.transcripts.fasta", sep = ""), 
+                   " ", paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3.all.maker.transcripts.renamed.fasta", sep = "")))
+cmd2[1]
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix)
+```
+
+**To remove the output files after you are done:**
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix); RemoveQsubTempFiles(sharedPathAn, prefix2); 
+```
+
+Now to rename the GFF3 files, using the ID mapping files created:
+```{r}
+prefix <- "post_maker_Renaming"
+cmd <- with(metadataAssemblies,
+            paste("perl ", makerMapGffPath, " ", paste(makerRnd3_OutputPath, SppAbbrv, ".map", sep = ""),
+                  " ", paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3.all.maker_jb.renamed.gff3", sep = ""), sep = ""))
+cmd[1]
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)                
+```
+
+**To remove the output files after you are done:**
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+Now to rename the protein and transcript fasta, using the ID mapping files created:
+```{r}
+prefix <- "post_maker_Renaming_Protein"
+cmd <- with(metadataAssemblies,
+            paste("perl ", makerMapFastaPath, " ", paste(makerRnd3_OutputPath, SppAbbrv, ".map", sep = ""),
+                  " ", paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3.all.maker.proteins.renamed.fasta", sep = ""), sep = ""))
+cmd[1]
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+
+prefix2 <- "post_maker_Renaming_Transcripts"
+cmd2 <- with(metadataAssemblies,
+             paste("perl ", makerMapFastaPath, " ", paste(makerRnd3_OutputPath, SppAbbrv, ".map", sep = ""),
+                   " ", paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3.all.maker.transcripts.renamed.fasta", sep = ""), sep = ""))
+cmd[1]
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix) 
+```
+
+**To remove the output files after you are done:**
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix); RemoveQsubTempFiles(sharedPathAn, prefix2) 
+```
+
+### Run a BLASTp of the renamed maker proteins fasta file against the uniprot-swiss-prot protein database.  
+Make sure you renamed your fasta files first and that you run a protein to protein BLAST.
+```{r}
+prefix <- "post_maker_BLASTp_uniProt_SwissProt"
+cmd <- with(metadataAssemblies,
+            paste(blastallPath, " -p blastp ", 
+                  " -i ", paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3.all.maker.proteins.renamed.fasta", sep = ""),
+                  " -d ", uniProtSwissPDB, " -e 0.01 -m 8 -b 1 ",
+                  " > ", paste(RepeatDBPath, SppAbbrv, "_uniProtswissProt_blast.out", sep = ""), sep = ""))
+cmd[1]
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix) 
+```
+
+### Run InterProScan on the MAKER proteins fasta files.  
+Here we run our proteins fasta files against the local installation of InterProScan. Not all functionallity is available
+since there are some components that require glbic updates for a couple of the database searches. The main thing here is to 
+make sure the output is in the format we require for the next step in MAKER which extracts the functional annotation obtained 
+from InterProScan to the annotations in our GFF3 file.
+```{r}
+prefix <- "post_maker_InterProScan_noGene3d"
+node <- "24"
+interproAppsNoGene3d <- "CDD-3.14,Coils-2.2.1,Hamap-201701.18,MobiDBLite-1.0,PANTHER-11.1,Pfam-31.0,PIRSF-3.02,PRINTS-42.0,ProDom-2006.1,ProSitePatterns-20.132,ProSiteProfiles-20.132,SMART-7.1,SUPERFAMILY-1.75,TIGRFAM-15.0"
+
+cmd <- with(metadataAssemblies,
+            paste("cd ", RepeatDBPath, " && ", interproPath, " ",
+                  " -i ", paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3.all.maker.proteins.renamed.fasta", sep = ""),
+                  " -appl ", interproAppsNoGene3d, " --cpu 24 ", sep = ""))
+cmd[3]
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
+```
+
+
+
+
+
 
 6. Iteratively Running MAKER to Improve Annotation.  
 One of the beauties of MAKER is that it can be run iteratively, using the gene models from the one round to train 
@@ -1704,28 +1938,6 @@ Keep evaluating your gene models after successive rounds of MAKER to identify wh
 The chunks below were removed from the pipeline for the second round of MAKER after being advised to 
 NOT train Augustus with BUSCO again after the 2nd round of MAKER:
 *** Note - remove the next chunk!!!
-Augustus with BUSCO:
-First, we must put together training sequences using the gene models we created in our 2nd run of MAKER.
-```{r}
-prefix <- "round2_maker-augustus_get_mRNA_regions"
-cmd <- with(metadataAssemblies,
-            paste("cd ", snapRnd1MakerRnd2Path, " && ",
-                  paste(' awk -v OFS="\t" \'{ if ($3 == "mRNA") print $1, $4, $5 }\'', sep = ""),
-                  " ", paste(makerRnd2_OutputPath, SppAbbrv, "_rnd2.all.maker.noseq.gff3", sep = ""),
-                  " | \ ",
-                  paste('awk -v OFS="\t" \'{ if ($2 < 1000) print $1, "0", $3+1000; else print $1, $2-1000, $3+1000 }\'', sep = ""),
-                  " | \ ",
-                  bedToolsPath, " getfasta -fi ", FixedNewAssemName, " -bed - -fo ",
-                  paste(SppAbbrv, "_rnd2.all.maker.transcripts1000.fasta", sep = "")))
-
-# Note, open the bash scripts, and edit so put the "\t" back in.
-suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
-```
-
-To remove the output files after you are done:
-```{r}
-RemoveQsubTempFiles(sharedPathAn, prefix)
-```
 
 Note - Concerned because BUSCOs decreased quite a bit after the second round. However, this is normal.
 The first round of Maker should generate a lot more models and genes, but these do not have much support.
@@ -1738,7 +1950,6 @@ https://groups.google.com/forum/#!topic/maker-devel/FhlVr1pKPw4
 
 Run BUSCO again, with Pezizomycotina set of conserved genes, as in round 1. However, for Augustus,
 we will specify our species-specific HMM models. 
-** Over here!! All species assemblies, except Lawi2 had this started 25jan2018
 **** Note - counselled to not train Augustus with BUSCO for the second round!
 ```{r}
 prefix <- "round2_Busco"
@@ -1767,52 +1978,6 @@ cmd <- with(metadataAssemblies, paste("cd ", snapRnd1MakerRnd2Path, " && rm core
 sapply(cmd, function(x) system(x))
 ```
 
-Post-processing of BUSCO HMM models to get them ready for MAKER.
-First rename the files within the augustus_output/retraining_parameters dir:
-```{r}
-metadataAssemblies$BuscoOut_Rnd2 <- paste(metadataAssemblies$snapRnd1MakerRnd2Path, "run_", metadataAssemblies$SppAbbrv, "_rnd2_maker/", sep = "")
-metadataAssemblies$BuscoRetrainParam_Rnd2 <- paste(metadataAssemblies$BuscoOut_Rnd2, "augustus_output/retraining_parameters/", sep = "")
-
-fl <- list.files(metadataAssemblies$BuscoRetrainParam_Rnd2, full.names = TRUE)
-
-# Rather than develop a script, I went to each dir and used rename on the files:
-# ~/perl5/bin/rename 's/BUSCO_Lari_rnd1_maker_1793275218/Lachnellula_arida/g' *
-# ~/perl5/bin/rename 's/BUSCO_Lcer_rnd1_maker_4199910028/Lachnellula_cervina/g' *
-# ~/perl5/bin/rename 's/BUSCO_Lhya_rnd1_maker_50067915/Lachnellula_hyalina/g' *
-# ~/perl5/bin/rename 's/BUSCO_Locc_rnd1_maker_1744752202/Lachnellula_occidentalis/g' * 
-# ~/perl5/bin/rename 's/BUSCO_Lsub_rnd1_maker_1107101620/Lachnellula_subtilissima/g' *
-# ~/perl5/bin/rename 's/BUSCO_Lsue_rnd1_maker_2422236784/Lachnellula_suecica/g' *
-# ~/perl5/bin/rename 's/BUSCO_Lawi_rnd1_maker_4015572171/Lachnellula_willkommii/g' *
-```
-
-We also need to rename the files cited within certain HMM configuration files:
-```{r}
-# sed -i 's/BUSCO_Lari_rnd1_maker_1793275218/Lachnellula_arida/g' Lachnellula_arida_parameters.cfg
-# sed -i 's/BUSCO_Lcer_rnd1_maker_4199910028/Lachnellula_cervina/g' Lachnellula_cervina_parameters.cfg
-# sed -i 's/BUSCO_Lhya_rnd1_maker_50067915/Lachnellula_hyalina/g' Lachnellula_hyalina_parameters.cfg
-# sed -i 's/BUSCO_Locc_rnd1_maker_1744752202/Lachnellula_occidentalis/g' Lachnellula_occidentalis_parameters.cfg
-# sed -i 's/BUSCO_Lsub_rnd1_maker_1107101620/Lachnellula_subtilissima/g' Lachnellula_subtilissima_parameters.cfg
-# sed -i 's/BUSCO_Lsue_rnd1_maker_2422236784/Lachnellula_suecica/g' Lachnellula_suecica_parameters.cfg
-# sed -i 's/BUSCO_Lawi_rnd1_maker_4015572171/Lachnellula_willkommii/g' Lachnellula_willkommii_parameters.cfg
-```
-
-Finally, we must copy these into the $AUGUSTUS_CONFIG_PATH species HMM location so they are accessible 
-by Augustus and MAKER. I had put the $AUGUSTUS_CONFIG_PATH in the .bash_profile, after copying the 
-directory from the isilon MAKER pipeline, for MAKER version 2.10. This is because I do not have 
-write access to the isilon directory, but I do have it for my local directory.
-
-Do this from within the dir /maker_round_1/snap/round1/run_Lsue_rnd1_maker/augustus_output/retraining_parameters/
-```{r}
-for(k in 1:nrow(metadataAssemblies)){
-    dir.create(paste("/home/CFIA-ACIA/girouxeml/prog/augustus/config/species/", metadataAssemblies$ScientificName[k], sep = ""),
-               showWarnings = TRUE, recursive = FALSE)
-}
-
-cmd <- with(metadataAssemblies,
-            paste("cd ", BuscoRetrainParam_Rnd2, " && cp ", ScientificName, "*", 
-                  " /home/CFIA-ACIA/girouxeml/prog/augustus/config/species/", ScientificName, sep = ""))
-sapply(cmd, function(x) system(x))
-```
 
 
 
