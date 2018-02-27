@@ -68,7 +68,6 @@ forgePath       <- paste(progPath, "snap/forge", sep = "")
 gagPath         <- paste(progPath, "gag/genomeannotation-GAG-40ea515/gag.py", sep = "")
 genemarkPath    <- paste(progPath, "genemark-es/gmes_petap.pl", sep = "") 
 hmmAssemPath    <- paste(progPath, "hmm-assembler.pl", sep = "") 
-interproPath    <- paste(progPath, "my_interproscan/interproscan-5.24-63.0/interproscan.sh", sep = "") 
 jbrowseFlatfile2json <- paste(progPath, "jbrowse/JBrowse-1.12.3/bin/flatfile-to-json.pl", sep = "")
 jbrowsePrepRefsSeqsPath <- paste(progPath, "jbrowse/JBrowse-1.12.3/bin/prepare-refseqs.pl", sep = "") 
 makerFastamerge <- paste(progPath, "maker/bin/fasta_merge", sep = "") 
@@ -94,6 +93,7 @@ makerMapPath    <- paste(scriptsPath, "maker_map_ids.pl", sep = "")
 # CFIA-Ottawa-Fallowfield user directory programs:
 programsPath    <- "/isilon/cfia-ottawa-fallowfield/users/girouxeml/prog/"
 buscoPezDataSet <- paste(programsPath, "busco_datasets/pezizomycotina_odb9/", sep = "")
+interproPath    <- paste(programsPath, "my_interproscan/interproscan-5.24-63.0/interproscan.sh", sep = "")
 uniProtSwissPDB <- paste(programsPath, "databases/uniprot_sprot.fasta", sep = "")
 ```
 
@@ -1839,6 +1839,7 @@ new directory just created.
 cmd <- with(metadataAssemblies, 
             paste("mv ", paste(metadataAssemblies$makerRnd3_OutputPath, metadataAssemblies$SppAbbrv, "_rnd3.all.maker_jb.gff3", sep = ""), 
                   " ", postMaker, sep = ""))
+
 sapply(cmd, function(x) system(x))
 ```
 
@@ -1954,17 +1955,23 @@ cmd <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix) 
 ```
 
-####### Over here!!! - need to remove QsubTemps:  
 **To remove the output files after you are done:**
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
 ### Run InterProScan on the MAKER proteins fasta files.  
-Here we run our proteins fasta files against the local installation of InterProScan. Not all functionallity is available
-since there are some components that require glbic updates for a couple of the database searches. The main thing here is to 
-make sure the output is in the format we require for the next step in MAKER which extracts the functional annotation obtained 
-from InterProScan to the annotations in our GFF3 file.  
+**Important:  
+In order to run our local installation of InterProScan with our local installation of the match lookup service, we need to have
+the lookup service running on the cluster first. We have the service set up on biocomp-0-3 and need to have it running specifically 
+on that node:  
+$ qlogin -l h=biocomp-0-3  
+$ cd /isilon/cfia-ottawa-fallowfield/users/girouxeml/prog/ i5_lookup_service/ lookup_service_5.24-63.0  
+$ java -Xmx2000m -jar server-5.24-63.0-jetty-console.war --headless --port 8080 &  
+  
+Now we can run InterProScan:  
+
+Here we run our proteins fasta files against the local installation of InterProScan. Not all functionallity is available since there are some components that require glbic updates for a couple of the database searches. The main thing here is to make sure the output is in the format we require for the next step in MAKER which extracts the functional annotation obtained from InterProScan to the annotations in our GFF3 file.  
 
 *** Note: There ar lots of failures going on - see how to set things up properly in the new directory...
 ```{r}
@@ -1973,13 +1980,11 @@ node   <- "24"
 interproAppsNoGene3d <- "CDD-3.14,Coils-2.2.1,Hamap-201701.18,MobiDBLite-1.0,PANTHER-11.1,Pfam-31.0,PIRSF-3.02,PRINTS-42.0,ProDom-2006.1,ProSitePatterns-20.132,ProSiteProfiles-20.132,SMART-7.1,SUPERFAMILY-1.75,TIGRFAM-15.0"
 
 cmd <- with(metadataAssemblies,
-            paste("cd ", postMaker, " && ", interproPath, " ",
+            paste("cd ", postMaker, " && ", interproPath, " -mode cluster -clusterrunid ipr_cluster_monitor_job ", 
                   " -i ", paste(postMaker, SppAbbrv, "_rnd3.maker.proteins.renamed.fasta", sep = ""),
-                  " -appl ", interproAppsNoGene3d, " --cpu 24 ", sep = ""))
+                  " -appl ", interproAppsNoGene3d, " -iprlookup -goterms --cpu ", node, sep = ""))
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```
-
-####### Over here!!! - need to remove QsubTemps:  
 
 **To remove the output files after you are done:**
 ```{r}
@@ -1990,43 +1995,59 @@ RemoveQsubTempFiles(sharedPathAn, prefix)
 InterProScan may fail. Make sure to check the error and output log files. Sometimes it's just a matter of restarting a run.
 I had a run fail because the protein fasta had a sequence with stop codons (*). In this case, you need to remove all the stop 
 codin (*) characters from the fasta file, and then restart the run.  
-  
+
 ### Add putative gene functions using the output from the BLAST job of our proteins against UniProt/SwissProt.  
-We can use maker_functional_gff to add putative functions from the BLAST report to out GFF3 files, and maker_functional_fasta to add 
-the putative functions from the BLAST report to out FASTA files. Note that this method only supports UniProt/SwissProt headers.
+We can use maker_functional_gff to add putative functions from the BLAST report to our GFF3 files, and maker_functional_fasta to add the putative functions from the BLAST report to out FASTA files. Note that this method only supports UniProt/SwissProt headers.
 ```{r}
-prefix <- "post_maker_func_gff"
+prefix <- "post_maker_func_gff_fasta"
 cmd    <- with(metadataAssemblies, 
-               paste("perl ", makerFuncGffPath, " ", uniProtSwissPDB, " ", 
-                     paste(RepeatDBPath, SppAbbrv, "_uniProtswissProt_blast.renamed.out", sep = ""), " ",
-                     paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3.all.maker_jb.renamed.gff3", sep = ""), " > ",
-                     paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3.all.maker_jb.renamed.putative_function.gff", sep = ""),
+               paste(# Add BLAST putative functions to the GFF3 file using maker_functional_gff:    
+                     "perl ", makerFuncGffPath, " ", uniProtSwissPDB, " ", 
+                     paste(postMaker, SppAbbrv, "_uniProtswissProt_blast.Renamed.out", sep = ""), " ",
+                     paste(postMaker, SppAbbrv, "_rnd3.all.maker_jb.renamed.gff3", sep = ""), " > ",
+                     paste(postMaker, SppAbbrv, "_rnd3.all.maker_jb.renamed.putative_function.gff; ", sep = ""),
+                     # Add BLAST putative functions to proteins fasta using maker_functional_fasta:  
+                     "perl ", makerFuncFasta, " ", uniProtSwissPDB, " ",
+                     paste(postMaker, SppAbbrv, "_uniProtswissProt_blast.Renamed.out", sep = ""), " ",
+                     paste(postMaker, SppAbbrv, "_rnd3.maker.proteins.renamed.fasta", sep = ""), " > ",
+                     paste(postMaker, SppAbbrv, "_rnd3.maker.proteins.renamed.putative_func.fasta; ", sep = ""),
+                     # Add BLAST putative functions to transcripts fasta using maker_functional_fasta:   
+                     "perl ", makerFuncFasta, " ", uniProtSwissPDB, " ",
+                     paste(postMaker, SppAbbrv, "_uniProtswissProt_blast.Renamed.out", sep = ""), " ",
+                     paste(postMaker, SppAbbrv, "_rnd3.maker.transcripts.renamed.fasta", sep = ""), " > ",
+                     paste(postMaker, SppAbbrv, "_rnd3.maker.transcripts.renamed.putative_func.fasta; ", sep = ""),
+                     # Gzip the renamed only files:
+                     "cd ", postMaker, " && gzip *.renamed.fast* ; ", 
+                     "cd ", postMaker, " && gzip *.renamed.gff* ",
                      sep = "")) 
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
-
-prefix2 <- "post_maker_func_fasta_proteins"
-cmd2    <- with(metadataAssemblies, 
-               paste("perl ", makerFuncFasta, " ", uniProtSwissPDB, " ", 
-                     paste(RepeatDBPath, SppAbbrv, "_uniProtswissProt_blast.renamed.out", sep = ""), " ",
-                     paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3.all.maker.proteins.renamed.fasta", sep = ""), " > ",
-                     paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3.all.maker.proteins.renamed.putative_function.fasta", sep = ""),
-                     sep = "")) 
-suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd2, prefix2, suffix, node)
-
-prefix3 <- "post_maker_func_fasta_transcripts"
-cmd3    <- with(metadataAssemblies, 
-               paste("perl ", makerFuncFasta, " ", uniProtSwissPDB, " ", 
-                     paste(RepeatDBPath, SppAbbrv, "_uniProtswissProt_blast.renamed.out", sep = ""), " ",
-                     paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3.all.maker.transcripts.renamed.fasta", sep = ""), " > ",
-                     paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3.all.maker.transcripts.renamed.putative_function.fasta", sep = ""),
-                     sep = "")) 
-suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd3, prefix3, suffix, node)
 ```
 
 **To remove the output files after you are done:**
 ```{r}
-RemoveQsubTempFiles(sharedPathAn, prefix); RemoveQsubTempFiles(sharedPathAn, prefix2); RemoveQsubTempFiles(sharedPathAn, prefix3)
+RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
+
+### Add protein domain information to the final annotations using the .tsv report generated from the InterProScan run.      
+
+ipr_update_gff - adds searchable tags to the gene and mRNA features in the GFF3 files  
+iprscan2gff3 - adds physical viewable features for daomains that can be displayed in JBrowse, Gbrowse, and Web Apollo.  
+  
+ipr_update_gff hsap_contig.renamed.putative_function.gff output.renamed.iprscan > hsap_contig.renamed.putative_function.domain_added.gff  
+iprscan2gff3 output.renamed.iprscan hsap_contig.renamed.gff > visible_iprscan_domains.gff   
+  
+now create a link with the maker.gff  
+
+ln -s maker_with_abinitio/annotationByType/maker.gff  
+
+Before to use the script allowing to load the information from Annie output to your annotation file you have to load some PATH to your profile. To do that just launch the following script:  
+~/annotation_course/course_material/lib/install_perllib_missing.sh  
+source ~/.bash_profile  
+  
+ipr_update_gff maker.gff interproscan.tsv > maker.with_interpro.gff  
+  
+Where a match is found, the new file will now include features called Dbxref and/or Ontology_term in the gene and transcript feature field (9th column).  
+
 
 ### Generation of NCBI Submission Files with GAG.  
 We can generate our genome submission files using the Genome Annotation Generator (GAG) prior to running BLAST and InterProScan.
