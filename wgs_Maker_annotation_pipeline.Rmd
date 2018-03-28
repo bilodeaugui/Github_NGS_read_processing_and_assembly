@@ -31,7 +31,7 @@ lapply(scriptsl, source)
 
 **Packages to install and have ready for later analyses:**
 ```{r}
-installed.packages("data.table")
+install.packages("data.table")
 ```
 
 **User: Define the path to the shared folder where the main working directory will be.**
@@ -1831,3 +1831,11 @@ parents aren't found. It means you need to go back to the MAKER round 3 gff file
 and then repeat this with the modified gff3 files you generate. Make sure you rename files that you edit so that you don't
 overwrite the original one. We can then transfer these files to a new directory we'll create to hold our files that are fixed/cleaned in this post-MAKER step. Instead of JBrowse, I used Geneious to visualise the annotations, but going through the steps to 
 prepare good GFF files for JBrowse allowed me to identify and fix problems in the GFF3 files.
+
+### Note: We can iteratively Running MAKER to Improve Annotations    
+One of the beauties of MAKER is that it can be run iteratively, using the gene models from the one round to train 
+ab initio software to improve the inference of gene models in the next round. Essentially, all one has to do is repeat 
+steps 4 and 5 to perform another round of annotation. The MAKER creators/maintainers recommend at least a couple rounds 
+of ab initio software training and MAKER annotation (i.e., 3 rounds total) and returns start to diminish (at differing rates) 
+thereafter. One needs to be careful not to overtrain Augustus and SNAP, so more rounds isn't necessarily always better. 
+Keep evaluating your gene models after successive rounds of MAKER to identify when you have sound models.
