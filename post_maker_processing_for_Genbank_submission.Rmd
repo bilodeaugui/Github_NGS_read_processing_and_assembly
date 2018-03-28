@@ -1,5 +1,5 @@
 ---
-title: "Maker_Pipeline"
+title: "Post-Maker processing for GenBank whole genome submissions"
 author: "Emily Giroux"
 date: "12/6/2017"
 output: html_document
