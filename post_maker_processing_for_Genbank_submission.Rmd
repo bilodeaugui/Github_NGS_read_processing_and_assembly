@@ -593,7 +593,9 @@ $ sed '/\t\t\tgene.*/d' genome.tbl.bak > genome.tbl
 $ mv genome.tbl Lari.tbl  
 $ mv genome.fasta Lari.fsa  
 
-# Create a tbl2asn directory where we will use the tbl2asn program from NCBI to create the NCBI submission files. In the process of creating these files, we will be given warnings for errors that will prevent successfull generation of valid NCBI files. The details given for these errors will help us go back to our input files, find the errors, and fix them up.  In this directory, we will need the NCBI submission template file for our species, the .tbl and .fsa (genome fasta) files. We give these the same prefix for the tbl2asn program to work, since it will capture the files we place in the direcotry.  
+### Use NCBI's tbl2asn program to create NCBI submission files   
+Create a tbl2asn directory where we will use the tbl2asn program from NCBI to create the NCBI submission files. In the process of creating these files, we will be given warnings for errors that will prevent successfull generation of valid NCBI files. The details given for these errors will help us go back to our input files, find the errors, and fix them up.  In this directory, we will need the NCBI submission template file for our species, the .tbl and .fsa (genome fasta) files. We give these the same prefix for the tbl2asn program to work, since it will capture the files we place in the direcotry.  
+  
 $ mkdir tbl2asn  
 $ cp ../../Lari_template.sbt tbl2asn/  
 $ cp L* tbl2asn/  # will copy the Lari.tbl and Lari.fsa to the tbl2asn directory.  
