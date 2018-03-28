@@ -31,7 +31,7 @@ lapply(scriptsl, source)
 
 **Packages to install and have ready for later analyses:**
 ```{r}
-installed.packages("data.table")
+install.packages("data.table")
 ```
 
 **User: Define the path to the shared folder where the main working directory will be.**
