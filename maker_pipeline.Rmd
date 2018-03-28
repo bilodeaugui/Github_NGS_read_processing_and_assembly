@@ -132,7 +132,7 @@ pepSclerscPath  <- paste(referencesPath, "Scerotinia_sclerotiorum_GCF_000146945.
 **Read in the metadata table:**  
 We need to specify where we put the assembly files for our genomes. We had this in our metadataAssembly table 
 from our previous script we ran called "RstudioScript-June2017_LachnellulaSpp_assemblies.Rmd"
-We can either read in the table, or take what we have fromt he environment. Reading in the table is better.
+We can either read in the table, or take what we have from the environment. Reading in the table is better.
 ```{r}
 library(data.table)
 metadataAssemblies <- fread(paste(sharedPathAn, "Lachnellula_genomes_MetadataAssembly.csv", sep = ""),
@@ -1792,7 +1792,7 @@ RemoveQsubTempFiles(sharedPathAn, prefix)
 
 **Compress Maker round 1 and 2 output directories**  
 We will be using files from MAKER round 3 for processing from now on, and so should compress these 
-directories to conserver space. If necessary, we can untar them and refer back to the files.
+directories to conserve space. If necessary, we can untar them and refer back to the files.
 ```{r}
 prefix <- "tar_zcvf_maker_round_2_3"
 cmd    <- with(metadataAssemblies, 
@@ -1848,6 +1848,7 @@ cmd <- with(metadataAssemblies,
 
 sapply(cmd, function(x) system(x))
 ```
+*** Over here - edits to keep the original names of the fasta files in the chunk below:
 
 Copy the trasncripts, proteins, and tRNA fasta files that were generated from the last round of MAKER
 to the new post MAKER directory, then compress files in the last MAKER run directory.
@@ -1856,13 +1857,13 @@ prefix <- "postMaker_cp_gz_fasta"
 cmd    <- with(metadataAssemblies, 
                paste("cp ", paste(metadataAssemblies$makerRnd3_OutputPath, metadataAssemblies$SppAbbrv,
                                   "_rnd3.all.maker.transcripts.fasta", sep = ""), 
-                     " ", paste(postMaker, SppAbbrv, "_rnd3.maker.transcripts.renamed.fasta; ", sep = ""), 
+                     " ", paste(postMaker, "/; ", sep = ""), 
                      "cp ", paste(metadataAssemblies$makerRnd3_OutputPath, metadataAssemblies$SppAbbrv,
                                   "_rnd3.all.maker.proteins.fasta", sep = ""), 
-                     " ", paste(postMaker, SppAbbrv, "_rnd3.maker.proteins.renamed.fasta; ", sep = ""),
+                     " ", paste(postMaker,"/; ", sep = ""),
                      "cp ", paste(metadataAssemblies$makerRnd3_OutputPath, metadataAssemblies$SppAbbrv,
                                   "_rnd3.all.maker.trnascan.transcripts.fasta", sep = ""), 
-                     " ", paste(postMaker, SppAbbrv, "_rnd3.maker.trna.renamed.fasta; ", sep = ""),
+                     " ", paste(postMaker, "/;", sep = ""),
                      "gzip ", paste(metadataAssemblies$makerRnd3_OutputPath, "*", sep = ""), sep = ""))
 
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
@@ -1912,6 +1913,9 @@ suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
+*** Over here - enter this part of the script with the assemblies with the contigs less <200 bp removed, after
+editing the gff3 files to have the tRNA info. Fix this up manually for now, in each genome directory.
+
 Run tbl2asn:
 ```{r}
 prefix <- "gag_pass2_tbl2asn"
@@ -1921,14 +1925,7 @@ cmd    <- with(metadataAssemblies,
                      "cd ", paste(postMaker, "gag/", previousGagDir, sep = ""), " && ",
                      "mkdir tbl2asn; ", 
                      
-                     # Prepare the genome.tbl for tbl2asn:
-                     "cd ", paste(postMaker, "gag/", previousGagDir, sep = ""), " && ",
-                     "mv genome.tbl genome.tbl.bak", "; ",
-                     
-                     # Prepare the genome.tbl for tbl2asn, sed:
-                     "cd ", paste(postMaker, "gag/", previousGagDir, sep = ""), " && ",
-                     "sed '/\t\t\tgene.*/d' genome.tbl.bak > genome.tbl", "; ",
-                     
+                     # *** Over here, I removed the sed commands acting onthe genome.tbl.
                      # Move the genome.tbl to proper suffix:
                      "cd ", paste(postMaker, "gag/", previousGagDir, sep = ""), " && ",
                      "mv genome.tbl ", paste(SppAbbrv, ".tbl", sep = ""), "; ",
@@ -1953,8 +1950,6 @@ cmd    <- with(metadataAssemblies,
                      sep = ""))
 cmd[1]
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix) 
-
-# ** Note - before running, edit the bash .sub files to fix the portion for sed, which doesn't turn out properly.
 ```
 
 **To remove the output files after you are done:**
@@ -1983,11 +1978,14 @@ metadataAssemblies$fixed_gag_fsa <- paste(metadataAssemblies$postMaker, metadata
 
 Editing the genome.proteins.fasta that were generated in the final round of GAG:    
 Copy proteins fasta to give new name:  
-$ cp Lachnellula_arida/Lari_RepeatDB/postMakerProcessing/gag/gag_pass2_eval/genome.proteins.fasta Lachnellula_arida/Lari_RepeatDB/postMakerProcessing/gag/gag_pass2_eval/Lari.proteins.gagPass2.fasta  
+$ cp Lachnellula_arida/Lari_RepeatDB/postMakerProcessing/gag/gag_pass2_eval/genome.proteins.fasta Lachnellula_arida/Lari_RepeatDB/postMakerProcessing/gag/gag_pass2_eval/Lari.proteins.gagPass2.noStops.fasta  
   
+*** Over here: I moved the edits to remove the stop codons that were later inthe script to this part - perhaps start
+running the script over from here?   
 Make changes to the proteins fasta to look like the original Maker output:  
-$ sed -i 's/>protein|/>/g' Lachnellula_arida/Lari_RepeatDB/postMakerProcessing/gag/gag_pass2_eval/Lari.proteins.gagPass2.fasta  
-$ sed -i 's/ ID=.*$/ protein/g' Lachnellula_arida/Lari_RepeatDB/postMakerProcessing/gag/gag_pass2_eval/Lari.proteins.gagPass2.fasta  
+$ sed -i 's/>protein|/>/g' Lachnellula_arida/Lari_RepeatDB/postMakerProcessing/gag/gag_pass2_eval/Lari.proteins.gagPass2.noStops.fasta  
+$ sed -i 's/ ID=.*$//g' Lachnellula_arida/Lari_RepeatDB/postMakerProcessing/gag/gag_pass2_eval/Lari.proteins.gagPass2.noStops.fasta  
+$ sed -i 's/*//g' Lari.proteins.gagPass2.noStops.fasta # To remove stop codon symbols that cause problems with downstream analysis
 Take a look:  
 $ head -5 Lachnellula_arida/Lari_RepeatDB/postMakerProcessing/gag/gag_pass2_eval/Lari.proteins.gagPass2.fasta  
 
@@ -2035,31 +2033,25 @@ Here we run our proteins fasta files against the local installation of InterProS
 
 This works:  
 Use the proteins fasta generated from the final round of GAG, with the fasta names edited to look like Maker.  
-Make a copy, and remove the * at the end of the protein sequences for IPR scan.  
-$ cp Lari.proteins.gagPass2.fasta Lari.proteins.gagPass2.nostop4ipr.fasta  
-$ sed -i 's/*//g' Lari.proteins.gagPass2.nostop4ipr.fasta  
 Run IPR scan with lookup service, with only pfam.  
-$ ~/prog/my_interproscan/interproscan-5.24-63.0/interproscan.sh -appl pfam -f TSV -iprlookup -goterms --cpu 11 -pa -t p -i Lari.proteins.gagPass2.nostop4ipr.fasta -o output.iprscan  
+$ ~/prog/my_interproscan/interproscan-5.24-63.0/interproscan.sh -appl pfam -f TSV -iprlookup -goterms --cpu 11 -pa -t p -i Lari.proteins.gagPass2.noStops.fasta -o output.iprscan  
 
-Example one-liner:  
-$ cp Lsue.proteins.gagPass2.fasta Lsue.proteins.gagPass2.nostop4ipr.fasta; sed -i 's/*//g' Lsue.proteins.gagPass2.nostop4ipr.fasta; head -5 Lsue.proteins.gagPass2.nostop4ipr.fasta;  ~/prog/my_interproscan/interproscan-5.24-63.0/interproscan.sh -appl pfam -f TSV -iprlookup -goterms --cpu 23 -pa -t p -i Lsue.proteins.gagPass2.nostop4ipr.fasta -o output.iprscan
+<!-- ## 8. Prepare tidy versions of the annotations.   -->
+<!-- Rename gene names from gff and other output files for annotations.   -->
+<!-- Make a copy of the gff file:   -->
+<!-- ```{r} -->
+<!-- cmd <- with(metadataAssemblies, -->
+<!--             paste("gunzip ", paste(postMaker, SppAbbrv, "_gag_edited.gff.gz", sep = ""), sep = "")) -->
+<!-- cmd[1] -->
+<!-- sapply(cmd, function(x) system(x)) -->
 
-## 8. Prepare tidy versions of the annotations.  
-Rename gene names from gff and other output files for annotations.  
-Make a copy of the gff file:  
-```{r}
-cmd <- with(metadataAssemblies,
-            paste("gunzip ", paste(postMaker, SppAbbrv, "_gag_edited.gff.gz", sep = ""), sep = ""))
-cmd[1]
-sapply(cmd, function(x) system(x))
+<!-- cmd <- with(metadataAssemblies, -->
+<!--             paste("cp ", paste(postMaker, SppAbbrv, "_gag_edited.gff", sep = ""),  -->
+<!--                   " ", paste(postMaker, SppAbbrv, "_gag_edited.renamed.gff", sep = ""), sep = "")) -->
 
-cmd <- with(metadataAssemblies,
-            paste("cp ", paste(postMaker, SppAbbrv, "_gag_edited.gff", sep = ""), 
-                  " ", paste(postMaker, SppAbbrv, "_gag_edited.renamed.gff", sep = ""), sep = ""))
-
-cmd[1]
-sapply(cmd, function(x) system(x))
-```
+<!-- cmd[1] -->
+<!-- sapply(cmd, function(x) system(x)) -->
+<!-- ``` -->
 
 Format the iprscan output to a 3-column table with Annie.py:  
 ```{r}
@@ -2071,16 +2063,15 @@ sapply(cmd, function(x) system(x))
 Format the blast output to a 3-column table with Annie.py:  
 ```{r}
 cmd <- with(metadataAssemblies, paste("cd ", postMaker, " && ", anniePath, " -b ", SppAbbrv, "_uniProtswissProt_blast.out",
-                                      " -g ", SppAbbrv, "_gag_edited.renamed.gff", " -db ", uniProtSwissPDB, sep = ""))
+                                      " -g ", SppAbbrv, "_gag_edited.gff", " -db ", uniProtSwissPDB, sep = ""))
 cmd[1]
 sapply(cmd, function(x) system(x))
 ```
 
-*** fsa mentioned here, could filter contigs less than 200 nt before this?  
 Add the Annie annotations to the gff using GAG:  
 ```{r}
 cmd <- with(metadataAssemblies, paste("cd ", postMaker, " && ", gagPath, " -f ", SppAbbrv, "_gag_edited.fsa",
-                                      " -g ", SppAbbrv, "_gag_edited.renamed.gff"," -a annie_output.tsv", 
+                                      " -g ", SppAbbrv, "_gag_edited.gff"," -a annie_output.tsv", 
                                       " -o gag_add_Annie_annotations", sep = ""))
 cmd[1]
 sapply(cmd, function(x) system(x))
