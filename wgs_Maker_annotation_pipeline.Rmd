@@ -1839,3 +1839,39 @@ steps 4 and 5 to perform another round of annotation. The MAKER creators/maintai
 of ab initio software training and MAKER annotation (i.e., 3 rounds total) and returns start to diminish (at differing rates) 
 thereafter. One needs to be careful not to overtrain Augustus and SNAP, so more rounds isn't necessarily always better. 
 Keep evaluating your gene models after successive rounds of MAKER to identify when you have sound models.
+
+### Final Notes:  
+After running the pipeline, we will have fasta files for the proteins, transcripts, etc, and gff files.  
+The protein fasta files will need to be edited to remove internal stop codons that may be present at the end of protein 
+sequences as these will interfere with downstream analyses. An easy way to do this is with the following command:  
+```{r}
+# Make a copy of the proteins fasta, with a new name that will indicate stops were removed:
+cmd <- with(metadataAssemblies,
+            paste("cp ", paste(makerRnd3_OutputPath, SppAbbrv, "_rnd3.all.maker.proteins.fasta", sep = ""),
+                  " ", paste(makerRnd3_OutputPath, SppAbbrv, ".proteins.noStops.fasta", sep = ""),
+                  sep = ""))
+cmd[1]
+sapply(cmd, function(x) system(x))
+# Use sed to remove stop codon symbols:
+cmd <- with(metadataAssemblies,
+            paste("sed -i 's/*//g'", 
+                  paste(makerRnd3_OutputPath, SppAbbrv, ".proteins.noStops.fasta", sep = ""),
+                  sep = ""))
+cmd[1]
+sapply(cmd, function(x) system(x))
+# other edits that may be good - fixing the protein headers:
+cmd <- with(metadataAssemblies,
+            paste("sed -i 's/>protein|/>/g'", 
+                  paste(makerRnd3_OutputPath, SppAbbrv, ".proteins.noStops.fasta", sep = ""),
+                  sep = ""))
+cmd[1]
+sapply(cmd, function(x) system(x))
+cmd <- with(metadataAssemblies,
+            paste("sed -i 's/ ID=.*$//g'", 
+                  paste(makerRnd3_OutputPath, SppAbbrv, ".proteins.noStops.fasta", sep = ""),
+                  sep = ""))
+cmd[1]
+sapply(cmd, function(x) system(x))
+```
+
+
