@@ -2285,8 +2285,28 @@ cmd <- paste("perl ", mergeB2GannotGFF,
 system(cmd)
 ```
 
+Using Blast2GO to create NCBI genome submission files. This requires the Pro version, so I've been
+using the trial. Key issue I had was that there were sequence descriptions after the sequence name
+of each contig inthe assembly files from Newbler, and this was causing the tool to be unable to 
+create files from and process any of the sequences. If you want to remove the description and 
+if your headers are structured like that: 
+"> + id + space + description"
 
+Once this part was removed, the tool worked.
 
+i.e.,
+
+>contig00001 1203988 12890445
+agccctgcgatcgatcgggctagctagc
+
+using sed:
+$ sed -e 's/^\(>[^[:space:]]*\).*/\1/' Lari_assembly_EG2017.fna > Lari_assembly_EG2017_mod.fna
+
+new format:
+>contig00001
+agccctgcgatcgatcgggctagctagc
+
+Now it works.
 
 
 
