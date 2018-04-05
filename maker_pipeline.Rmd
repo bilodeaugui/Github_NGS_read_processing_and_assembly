@@ -1282,7 +1282,7 @@ sapply(cmd, function(x) system(x))
 ```
 
 **iii. Run BUSCO using the Augustus species HMM to look at the results:**  
-We can run BUSCO using the Augustus species HMM we obtained, without having to training Augustus. Only include the 
+We can run BUSCO using the Augustus species HMM we obtained, without having to train Augustus. Only include the 
 transcript sequences, and not the 1000 bp on each side, and be sure to take the best (i.e., longest) transcript for
 each gene so we aren't artificially seeding duplicates. We could also run it on the best protein sequence per gene
 instead. 
@@ -1747,7 +1747,7 @@ sapply(cmd, function(x) system(x))
 ```
 
 **iii. Run BUSCO using the Augustus species HMM to look at the results:**  
-We can run BUSCO using the Augustus species HMM we obtained, without having to training Augustus. Only include the 
+We can run BUSCO using the Augustus species HMM we obtained, without having to train Augustus. Only include the 
 transcript sequences, and not the 1000 bp on each side, and be sure to take the best (i.e., longest) transcript for
 each gene so we aren't artificially seeding duplicates. We could also run it on the best protein sequence per gene
 instead.  
