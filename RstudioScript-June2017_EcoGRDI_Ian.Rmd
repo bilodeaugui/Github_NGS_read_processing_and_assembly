@@ -522,4 +522,18 @@ cmd[1]
 suffix <- ".sub"
 MakeQsubs(cmd, prefix, suffix)
 ```
+To remove the output files after you are done:
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
 
+Add the names of the fasta files to the metadata table:
+```{r}
+metadataAdapRM$fastaTrimAdapRem <- paste(metadataAdapRM$pathFastq, metadataAdapRM$LibraryName, ".adapRemMerged_trimmomatic.fasta", sep = "")
+```
+
+
+```{python}
+import pandas as pd
+
+```
