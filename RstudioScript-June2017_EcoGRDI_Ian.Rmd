@@ -399,32 +399,127 @@ for(k in 1:nrow(metadataRaw)){
     cat("\n")}
 ```
 
-PrinSeq graph reports of raw reads. 
-Step 2: html file generation:
-```{r echo = FALSE, cache = TRUE}
-prefix2 <- "C2_PrinSeqRawGraphs"
-cmd <- MakePrinSeqHTML(metadataRaw, prefix, metadataRaw$RawGraphName)
-suffix <- ".sub"  
-MakeQsubs(cmd, prefix2, suffix)
+Adapter removal:
+```{r}
+prefix <- "D_SeqPrep_adapter_Removal"
+if(libraryLayout == 2){
+    cmd <- with(metadataRaw, 
+            paste(seqPrepPath, 
+                  " -f ", pathFastq, R1,
+                  " -r ", pathFastq, R2,
+                  " -1 ", pathFastq, LibraryName, ".adapRem.R1.fastq.gz",
+                  " -2 ", pathFastq, LibraryName, ".adapRem.R2.fastq.gz",
+                  " -A ", fwdAdap,
+                  " -B ", revAdap,
+                  " -s ", pathFastq, paste(LibraryName, ".adapRemMerged.fastq.gz", sep = ""),
+                  sep = ""))} else if 
+(libraryLayout != 2){
+    cmd <- with(metadataRaw, 
+            paste(seqPrepPath, 
+                  " -f ", pathFastq, RawFastq,
+                  " -1 ", pathFastq, LibraryName, ".adapRem.fastq.gz",
+                  " -A ", fwdAdap,
+                  sep = ""))
+}
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
+
+cmd[1]
 ```
-If ever you need to upload the .gd file on the PrinSeq web server to generate the html files:
-http://edwards.sdsu.edu/cgi-bin/prinseq/prinseq.cgi?report=1 
-You can follow the progress of the PrinSeq graph generation run with the following:
-```{r, echo=FALSE, cache=TRUE}
-for(k in 1:nrow(metadataRaw)){
-    cat(c(k, metadataRaw$LibraryName[k]))
-    cat("\n")
-    system(paste("cat ", sharedPathAn, prefix2, "/", prefix2, k, suffix, ".e*", sep = ""))
-    cat("\n")}
+
+To show the output of each pair on the console in Rstudio:
+```{r}
+if(libraryLayout == 2){
+    for(k in 1:nrow(metadataRaw)) {
+      cat(c(k, metadataRaw$R1[k], metadataRaw$R2[k]))
+      cat("\n")
+      system(paste("tail ", sharedPathAn, prefix, "/", prefix, k, suffix, ".e* | head -n 10" , sep=""))
+      cat("\n")
+    }
+    } else if
+(libraryLayout != 2){
+    for(k in 1:nrow(metadataRaw)) {
+      cat(c(k, metadataRaw$RawFastq[k]))
+      cat("\n")
+      system(paste("tail ", sharedPathAn, prefix, "/", prefix, k, suffix, ".e* | head -n 10" , sep=""))
+      cat("\n")
+    }
+}
 ```
 
 To remove the output files after you are done:
 ```{r}
-RemoveQsubTempFiles(sharedPathAn, prefix2)
+RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
-*** Over here!!! GPSC 26Sept2018 - testing git push
+```{r}
+library("reshape2")
+metadataAdapRM <- dcast(data = metadata, LibraryName + Region + Sample + Provider + Experiment + ExtractionKit + AdapRemMerged
+                        ~ ReadDirection, value.var = "BaseCallsName", FUN = c)
+metadataAdapRM$ShortName <- paste(metadataAdapRM$LibraryName, sep = ".")
+colnames(metadataAdapRM)[colnames(metadataAdapRM) == "AdapRemMerged"] <- "MergedReads"
+```
 
 
+Using trimmomatic:
+```{r}
+trimmomaticPath  <- "/fs/hnas1-evs1/Dgrdi/grdi_eco/groups/bilodeaug/gir001/.conda/envs/mpienv/bin/trimmomatic"
+cmd <- paste(trimmomaticPath, " --help", sep = "")
+system(cmd)
+```
+Trimmomatic variables:
+```{r}
+prefix <- "E_Trimmomatic"
+headcrop      <- "10"
+slidingwindow <- "4:20"
+minlen        <- "36"
+leading       <- "0"
+trailing      <- "0"
+crop          <- "1000"
+avgqual       <- "0"
+illuminaclip  <- "null.fa:0:0:0"
+cmd <- with(metadataAdapRM,
+            paste(trimmomaticPath, " SE ",
+                  " ", paste(pathFastq, MergedReads, ".gz", sep = ""),
+                  " ", paste(pathFastq, LibraryName, ".adapRemMerged_trimmomatic.fastq.gz", sep = ""),
+                  " -phred33 ",
+                  " -trimlog ", paste(LibraryName, ".log", sep = ""),
+                  " -summary ", paste(LibraryName, ".stat", sep = ""),
+                  " HEADCROP:", headcrop,
+                  " SLIDINGWINDOW:", slidingwindow,
+                  " MINLEN:", minlen,
+                  " LEADING:", leading,
+                  " TRAILING:", trailing,
+                  " CROP:", crop,
+                  " AVGQUAL:", avgqual,
+                  #" ILLUMINACLIP:", illuminaclip,
+                  sep = ""))
+cmd[1]
+suffix <- ".sub"
+MakeQsubs(cmd, prefix, suffix)
+# $ parallel ::: ./*sub 2>&1 | tee maker.log
+```
 
+Record the trimmed output in the metadata tablee:
+```{r}
+metadataAdapRM$mergedTrimmo <- paste(metadataAdapRM$LibraryName, ".adapRemMerged_trimmomatic.fastq.gz", sep = "")
+```
+
+Convert fastq to fasta, as per SnakeMake pipeline:
+```{r}
+fastq2faPath    <- "/fs/hnas1-evs1/Dgrdi/grdi_eco/groups/bilodeaug/gir001/.conda/envs/mpienv/bin/fastqToFa"
+cmd <- paste(fastq2faPath, sep = "")
+system(cmd)
+
+prefix <- "F_fastq2fasta"
+
+cmd <- with(metadataAdapRM,
+            paste("gunzip ", paste(pathFastq, mergedTrimmo, sep = ""), "\n",
+                  " ", fastq2faPath, " -verbose=2 ",
+                  " ", paste(pathFastq, LibraryName, ".adapRemMerged_trimmomatic.fastq", sep = ""),
+                  " ", paste(pathFastq, LibraryName, ".adapRemMerged_trimmomatic.fasta", sep = ""),
+                  sep = ""))
+cmd[1]
+suffix <- ".sub"
+MakeQsubs(cmd, prefix, suffix)
+```
 
