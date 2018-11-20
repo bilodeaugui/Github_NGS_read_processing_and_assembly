@@ -532,8 +532,99 @@ Add the names of the fasta files to the metadata table:
 metadataAdapRM$fastaTrimAdapRem <- paste(metadataAdapRM$pathFastq, metadataAdapRM$LibraryName, ".adapRemMerged_trimmomatic.fasta", sep = "")
 ```
 
+-----------------------------starting November 20, 2019 author: Beatriz Lujan-----------------------------------
 
-```{python}
-import pandas as pd
+*Created a new function to submit jobs that works in the GPSC, called MakeJobs() to substitute MakeQsubs(). 
 
+PIPELINE STEP G: G_pick_otus (CLUSTERING)
+
+step 1 (optional): if desired, subset the data before clustering:
+
+```{r}
+subData <- subset(metadataAdapRM, Region == "16S") #choosing only 16S
+subData <- subset(sub_data, Sample == "soil") #choosing only soil samples
+subsetHeader <- "16S_soil" # create a header for the type of subsetting IF NO SUBSETTING USE ALL
 ```
+step 2.1: create a single fasta file with all sequences to cluster and rename the fasta headers
+
+```{r}
+prefix <- "G_pick_otus"
+dir.create(paste(sharedPathAn, prefix, sep = ""), showWarnings = TRUE, recursive = FALSE) 
+mergedFasta <- paste(sharedPathAn, prefix,  "/", subsetHeader, "_adapRemMerged_trimmomatic_unsorted.fasta", sep= "")
+for(name in subData$LibraryName) { 
+  newSampleName <- gsub("_", "-", name)
+  print(newSampleName)
+  system(paste("sed \'s/^>[:alnum:]*/>", newSampleName, "_/\' ", 
+               sharedPathAn, seqDataDir, "/", name,  ".adapRemMerged_trimmomatic.fasta >> ", 
+               mergedFasta, sep = ""))
+}
+```
+
+step 2.1: add qiime header name to metadata (subData)
+```{r}
+subData$qiimeName <- gsub("_", "-", subData$LibraryName) #replace underscores with dash for qiime
+```
+
+step3: create jobsub  for qiime pick_otu
+
+```{r}
+prefix <- "G_pick_otus"
+cmd <- paste ("pick_otus.py -i ", mergedFasta ," -m uclust -s 0.97 -o ", sharedPathAn, prefix, sep = "")
+MakeJobs(cmd, prefix, 4, 3000, 172800, "yes")
+```
+run jobs by running jobsub_all.job
+```{r}
+system(paste("jobsub ", sharedPathAn, prefix, "/", "jobsub_all.job", sep = ""))
+# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.e*", sep = "")) #remove error files
+# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.o*", sep = "")) #remove output files
+```
+
+Add more info to the qiime log and write metadata csv that is relevant to the analysis
+```{r}
+pickOtuVersion <- system("pick_otus.py --version", intern = TRUE)
+pickOtuLog <- gsub(".fasta", "_otus.log", mergedFasta)
+system (paste("echo \'\nInput file: ", mergedFasta, "\' >> ", pickOtuLog , sep = "")) #add input file to log
+system (paste("echo \'Data subsetting: ", subsetHeader, "\' >> ", pickOtuLog , sep = "")) #add subsetting type that was used to prepare fasta file
+system (paste("echo \'Metadata: ", subsetHeader, "-metadata.csv\' >> ", pickOtuLog , sep = "")) #add subsetting type that was used to prepare fasta file
+system (paste("echo \'", pickOtuVersion, "\' >> ", pickOtuLog , sep = "")) #add version to log
+system (paste("echo \'", Sys.time(), "\' >> ", pickOtuLog , sep = "")) #add time to log
+write.csv(subData, file = paste(sharedPathAn, prefix, "/", subsetHeader,"-metadata.csv", sep = ""))
+```
+
+PIPELINE STEP H: H_pick_representatives 
+
+```{r}
+pickOtutxt <- gsub(".fasta", "_otus.txt", mergedFasta)
+prefix <- "H_pick_representatives"
+repSeq <- paste (sharedPathAn, prefix, "/", subsetHeader, "_representative_seqs_set.fasta" , sep = "")
+cmd <- paste("pick_rep_set.py -i ", pickOtutxt, " -f ", mergedFasta, " -m longest -o ", repSeq , sep = "")
+MakeJobs(cmd, prefix, 4, 1800, 172800, "yes")
+```
+
+run jobs by running jobsub_all.job
+```{r}
+system(paste("jobsub ", sharedPathAn, prefix, "/", "jobsub_all.job", sep = ""))
+# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.e*", sep = "")) #remove error files
+# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.o*", sep = "")) #remove output files
+```
+
+PIPELINE STEP I: I_remove_chimeric_sequences
+
+input
+        dataset = "step5_pick_representatives/representative_seqs_set.fasta",
+        reference_fasta = config["reference_fasta"],
+        reference_txt = config["reference_taxonomy"]
+    output:
+        chimeric_list = "step6_removeChimericSeqs/chimeraList.txt",
+        rep_set = "step6_removeChimericSeqs/representative_seq_noChimera.fasta"
+   
+        check_chimeric_seqs_cmd="parallel_identify_chimeric_seqs.py -i {input.dataset} -t {input.reference_txt} -r {input.reference_fasta} -m blast_fragments -o {output.chimeric_list} -O {config[threads]}" 
+        
+        remove_chimeric_seqs_cmd="filter_fasta.py -f {input.dataset} -o {output.rep_set} -s {output.chimeric_list} -n" ;\
+
+
+
+To load and save the environment more easily:
+load("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/Github_Projects/Github_NGS_read_processing_and_assembly/EcoIan_Beatriz.RData")
+save.image("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/Github_Projects/Github_NGS_read_processing_and_assembly/EcoIan_Beatriz.RData")
+
