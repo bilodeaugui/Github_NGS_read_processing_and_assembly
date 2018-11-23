@@ -542,10 +542,11 @@ step 1 (optional): if desired, subset the data before clustering:
 
 ```{r}
 subData <- subset(metadataAdapRM, Region == "16S") #choosing only 16S
-subData <- subset(sub_data, Sample == "soil") #choosing only soil samples
-subsetHeader <- "16S_soil" # create a header for the type of subsetting IF NO SUBSETTING USE ALL
+#subData <- subset(sub_data, Sample == "soil") #choosing only soil samples
+subsetHeader <- "16S" # create a header for the type of subsetting IF NO SUBSETTING USE ALL
 ```
 step 2.1: create a single fasta file with all sequences to cluster and rename the fasta headers
+(into qiime acceptable headers)
 
 ```{r}
 prefix <- "G_pick_otus"
@@ -560,7 +561,8 @@ for(name in subData$LibraryName) {
 }
 ```
 
-step 2.1: add qiime header name to metadata (subData)
+step 2.2: add qiime header name to metadata (subData)
+
 ```{r}
 subData$qiimeName <- gsub("_", "-", subData$LibraryName) #replace underscores with dash for qiime
 ```
@@ -573,6 +575,7 @@ cmd <- paste ("pick_otus.py -i ", mergedFasta ," -m uclust -s 0.97 -o ", sharedP
 MakeJobs(cmd, prefix, 4, 3000, 172800, "yes")
 ```
 run jobs by running jobsub_all.job
+
 ```{r}
 system(paste("jobsub ", sharedPathAn, prefix, "/", "jobsub_all.job", sep = ""))
 # system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.e*", sep = "")) #remove error files
@@ -601,30 +604,132 @@ cmd <- paste("pick_rep_set.py -i ", pickOtutxt, " -f ", mergedFasta, " -m longes
 MakeJobs(cmd, prefix, 4, 1800, 172800, "yes")
 ```
 
-run jobs by running jobsub_all.job
+run jobs by running jobsub_all.job:
 ```{r}
 system(paste("jobsub ", sharedPathAn, prefix, "/", "jobsub_all.job", sep = ""))
 # system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.e*", sep = "")) #remove error files
 # system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.o*", sep = "")) #remove output files
 ```
 
-PIPELINE STEP I: I_remove_chimeric_sequences
+PIPELINE STEP I: I_identify_chimeric_seqs --> I/J steps are optional*
 
-input
-        dataset = "step5_pick_representatives/representative_seqs_set.fasta",
-        reference_fasta = config["reference_fasta"],
-        reference_txt = config["reference_taxonomy"]
-    output:
-        chimeric_list = "step6_removeChimericSeqs/chimeraList.txt",
-        rep_set = "step6_removeChimericSeqs/representative_seq_noChimera.fasta"
-   
-        check_chimeric_seqs_cmd="parallel_identify_chimeric_seqs.py -i {input.dataset} -t {input.reference_txt} -r {input.reference_fasta} -m blast_fragments -o {output.chimeric_list} -O {config[threads]}" 
-        
-        remove_chimeric_seqs_cmd="filter_fasta.py -f {input.dataset} -o {output.rep_set} -s {output.chimeric_list} -n" ;\
+Removing chimeric sequences is suggested in most workflows. Snakemake v0.4 suggests this step.
+Have to set a variable: $ export BLASTMAT=/opt/bio/ncbi/data/ so that blast works.
+Note: Reference files are provided in the training modules, this is a 16S reference database
 
+```{r}
+prefix <- "I_identify_chimeric_seqs"
+refFasta <- "/space/project/grdi/eco/training/20170223/pipeline/snakemake-workflows-0.2/greengenes_97_otus.fasta"
+refTaxonomy <- "/space/project/grdi/eco/training/20170223/pipeline/snakemake-workflows-0.2/greengenes_97_otu_taxonomy.txt"
+chimericList <- paste(sharedPathAn, prefix, "/", subsetHeader, "_chimera_list.txt" , sep="")
+threads <- "4"
+tempFolder <- paste(sharedPathAn, prefix, "/", "mytemp", sep= "")
+cmd <- paste ("mkdir ", tempFolder, "\n",
+              "export TMPDIR=", tempFolder, "\n",
+              "export BLASTMAT=/opt/bio/ncbi/data/\n",
+              "time parallel_identify_chimeric_seqs.py -i ", repSeq, " -t ", refTaxonomy, " -r ", 
+              refFasta, " -m blast_fragments -o ", chimericList, " -O ", threads, 
+              "\nrm -r ", tempFolder, sep = "" )
+MakeJobs(cmd, prefix, threads, 5000, 172800, "yes")
+```
+run jobs by running jobsub_all.job:
+```{r}
+system(paste("jobsub ", sharedPathAn, prefix, "/", "jobsub_all.job", sep = ""))
+# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.e*", sep = "")) #remove error files
+# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.o*", sep = "")) #remove output files
+```
 
+PIPELINE STEP J: J_remove_chimeric_seqs --> I/J steps are optional*
 
-To load and save the environment more easily:
-load("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/Github_Projects/Github_NGS_read_processing_and_assembly/EcoIan_Beatriz.RData")
-save.image("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/Github_Projects/Github_NGS_read_processing_and_assembly/EcoIan_Beatriz.RData")
+```{r}
+prefix <- "J_remove_chimeric_seqs"
+repSeqNoChimera <-paste (sharedPathAn, prefix, "/", subsetHeader, "_representative_seqs_noChimera.fasta" , sep = "")
+cmd <- paste ("time filter_fasta.py -f ", repSeq, " -o ", repSeqNoChimera, " -s ", chimericList, " -n", sep="")
+MakeJobs(cmd, prefix, 1, 3000, 172800, "yes")
+```
+
+run jobs by running jobsub_all.job:
+```{r}
+system(paste("jobsub ", sharedPathAn, prefix, "/", "jobsub_all.job", sep = ""))
+# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.e*", sep = "")) #remove error files
+# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.o*", sep = "")) #remove output files
+```
+
+--> I/J steps are optional*: snakemake v 0.1 does not have this step, but was later added (v0.4). 
+Many suggest that this step is a must. I have added an if statement in step J in case
+chimeric sequence removal step is not done, it can still continue the pipeline with the 
+previous fasta file. 
+
+PIPELINE STEP K: K_classify
+
+Assign taxonomy with confidence of 0.70 as per snakemake suggestion
+
+```{r}
+prefix <- "K_classify" ## running tests with a different command 
+tempFolder <- paste(sharedPathAn, prefix, "/", "mytemp", sep= "")
+if (file.exists(repSeqNoChimera)){
+  inputFasta <- repSeqNoChimera
+} else {
+  inputFasta <- repSeq
+}
+classifyConfidence <- "0.70"
+threads <- "4"
+cmd <- paste ("mkdir ", tempFolder, "\n",
+              "export TMPDIR=", tempFolder, "\n",
+              "time parallel_assign_taxonomy_rdp.py -i ", inputFasta, " -r ", refFasta, " -t ", refTaxonomy, 
+               " -c ", classifyConfidence, " -o ", sharedPathAn, prefix, " --rdp_max_memory 10000 -O ", threads,  
+              #sep = "" )
+              "\nrm -r ", tempFolder, sep = "" )
+# UNCOMMENT THE NEXT COMAND IF MOTHUR IS PREFERED INSTEAD OF PARALLEL RDP
+#cmd <- paste ("time assign_taxonomy.py -i ", inputFasta, " -m mothur -r ", refFasta, " -t ", refTaxonomy, 
+#             " -c ", classifyConfidence, " -o ", prefix, sep = "" )
+MakeJobs(cmd, prefix, threads, 5000, 172800, "yes")
+taxAssignments <- paste (sharedPathAn, prefix, "/", gsub(".fasta", "_tax_assignments.txt", basename(inputFasta)), sep="" )
+```
+
+run jobs by running jobsub_all.job:
+```{r}
+system(paste("jobsub ", sharedPathAn, prefix, "/", "jobsub_all.job", sep = ""))
+# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.e*", sep = "")) #remove error files
+# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.o*", sep = "")) #remove output files
+```
+
+PIPELINE STEP L: L_make_otu 
+
+Make OTU table as a biom file.
+Biom file: the columns correspond to Samples and rows correspond to OTUs
+and the number of times a sample appears in a particular OTU
+
+```{r}
+prefix <- "L_make_otu"
+biomTable <- paste (sharedPathAn, prefix, "/", subsetHeader, "_otu_table.biom", sep="")
+cmd <- paste ("make_otu_table.py -i ", pickOtutxt, " -t ", taxAssignments, " -o ", biomTable, sep="")
+MakeJobs(cmd, prefix, 1, 3000, 172800, "yes")
+```
+
+run jobs by running jobsub_all.job:
+```{r}
+system(paste("jobsub ", sharedPathAn, prefix, "/", "jobsub_all.job", sep = ""))
+# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.e*", sep = "")) #remove error files
+# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.o*", sep = "")) #remove output files
+```
+
+PIPELINE STEP M: M_convert_otu_table 
+
+Convert OTU table in biom format to tab-delimited table format.
+
+```{r}
+prefix <- "M_convert_otu_table"
+otuTable <- paste (sharedPathAn, prefix, "/", gsub(".biom", ".otu", basename(biomTable)), sep="" )
+cmd <- paste("biom convert -i ", biomTable, " -o ", otuTable, " --to-tsv --header-key taxonomy", sep="")
+MakeJobs(cmd, prefix, 1, 3000, 172800, "yes")
+```
+
+run jobs by running jobsub_all.job:
+```{r}
+system(paste("jobsub ", sharedPathAn, prefix, "/", "jobsub_all.job", sep = ""))
+# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.e*", sep = "")) #remove error files
+# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.o*", sep = "")) #remove output files
+```
+
 
