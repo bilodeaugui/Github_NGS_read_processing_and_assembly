@@ -549,9 +549,9 @@ step 2.1: create a single fasta file with all sequences to cluster and rename th
 (into qiime acceptable headers)
 
 ```{r}
-prefix <- "G_pick_otus"
-dir.create(paste(sharedPathAn, prefix, sep = ""), showWarnings = TRUE, recursive = FALSE) 
-mergedFasta <- paste(sharedPathAn, prefix,  "/", subsetHeader, "_adapRemMerged_trimmomatic_unsorted.fasta", sep= "")
+prefix_G <- "G_pick_otus"
+dir.create(paste(sharedPathAn, prefix_G, sep = ""), showWarnings = TRUE, recursive = FALSE) 
+mergedFasta <- paste(sharedPathAn, prefix_G,  "/", subsetHeader, "_adapRemMerged_trimmomatic_unsorted.fasta", sep= "")
 for(name in subData$LibraryName) { 
   newSampleName <- gsub("_", "-", name)
   print(newSampleName)
@@ -570,16 +570,16 @@ subData$qiimeName <- gsub("_", "-", subData$LibraryName) #replace underscores wi
 step3: create jobsub  for qiime pick_otu
 
 ```{r}
-prefix <- "G_pick_otus"
-cmd <- paste ("pick_otus.py -i ", mergedFasta ," -m uclust -s 0.97 -o ", sharedPathAn, prefix, sep = "")
-MakeJobs(cmd, prefix, 4, 3000, 172800, "yes")
+prefix_G <- "G_pick_otus"
+cmd <- paste ("pick_otus.py -i ", mergedFasta ," -m uclust -s 0.97 -o ", sharedPathAn, prefix_G, sep = "")
+MakeJobs(cmd, prefix_G, 4, 3000, 172800, "yes")
 ```
 run jobs by running jobsub_all.job
 
 ```{r}
-system(paste("jobsub ", sharedPathAn, prefix, "/", "jobsub_all.job", sep = ""))
-# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.e*", sep = "")) #remove error files
-# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.o*", sep = "")) #remove output files
+system(paste("jobsub ", sharedPathAn, prefix_G, "/", "jobsub_all.job", sep = ""))
+# system(paste("rm  ", sharedPathAn, prefix_G, "/", "*.job.e*", sep = "")) #remove error files
+# system(paste("rm  ", sharedPathAn, prefix_G, "/", "*.job.o*", sep = "")) #remove output files
 ```
 
 Add more info to the qiime log and write metadata csv that is relevant to the analysis
@@ -591,24 +591,24 @@ system (paste("echo \'Data subsetting: ", subsetHeader, "\' >> ", pickOtuLog , s
 system (paste("echo \'Metadata: ", subsetHeader, "-metadata.csv\' >> ", pickOtuLog , sep = "")) #add subsetting type that was used to prepare fasta file
 system (paste("echo \'", pickOtuVersion, "\' >> ", pickOtuLog , sep = "")) #add version to log
 system (paste("echo \'", Sys.time(), "\' >> ", pickOtuLog , sep = "")) #add time to log
-write.csv(subData, file = paste(sharedPathAn, prefix, "/", subsetHeader,"-metadata.csv", sep = ""))
+write.csv(subData, file = paste(sharedPathAn, prefix_G, "/", subsetHeader,"-metadata.csv", sep = ""))
 ```
 
 PIPELINE STEP H: H_pick_representatives 
 
 ```{r}
 pickOtutxt <- gsub(".fasta", "_otus.txt", mergedFasta)
-prefix <- "H_pick_representatives"
-repSeq <- paste (sharedPathAn, prefix, "/", subsetHeader, "_representative_seqs_set.fasta" , sep = "")
+prefix_H <- "H_pick_representatives"
+repSeq <- paste (sharedPathAn, prefix_H, "/", subsetHeader, "_representative_seqs_set.fasta" , sep = "")
 cmd <- paste("pick_rep_set.py -i ", pickOtutxt, " -f ", mergedFasta, " -m longest -o ", repSeq , sep = "")
-MakeJobs(cmd, prefix, 4, 1800, 172800, "yes")
+MakeJobs(cmd, prefix_H, 4, 1800, 172800, "yes")
 ```
 
 run jobs by running jobsub_all.job:
 ```{r}
-system(paste("jobsub ", sharedPathAn, prefix, "/", "jobsub_all.job", sep = ""))
-# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.e*", sep = "")) #remove error files
-# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.o*", sep = "")) #remove output files
+system(paste("jobsub ", sharedPathAn, prefix_H, "/", "jobsub_all.job", sep = ""))
+# system(paste("rm  ", sharedPathAn, prefix_H, "/", "*.job.e*", sep = "")) #remove error files
+# system(paste("rm  ", sharedPathAn, prefix_H, "/", "*.job.o*", sep = "")) #remove output files
 ```
 
 PIPELINE STEP I: I_identify_chimeric_seqs --> I/J steps are optional*
@@ -618,41 +618,41 @@ Have to set a variable: $ export BLASTMAT=/opt/bio/ncbi/data/ so that blast work
 Note: Reference files are provided in the training modules, this is a 16S reference database
 
 ```{r}
-prefix <- "I_identify_chimeric_seqs"
+prefix_I <- "I_identify_chimeric_seqs"
 refFasta <- "/space/project/grdi/eco/training/20170223/pipeline/snakemake-workflows-0.2/greengenes_97_otus.fasta"
 refTaxonomy <- "/space/project/grdi/eco/training/20170223/pipeline/snakemake-workflows-0.2/greengenes_97_otu_taxonomy.txt"
-chimericList <- paste(sharedPathAn, prefix, "/", subsetHeader, "_chimera_list.txt" , sep="")
+chimericList <- paste(sharedPathAn, prefix_I, "/", subsetHeader, "_chimera_list.txt" , sep="")
 threads <- "4"
-tempFolder <- paste(sharedPathAn, prefix, "/", "mytemp", sep= "")
+tempFolder <- paste(sharedPathAn, prefix_I, "/", "mytemp", sep= "")
 cmd <- paste ("mkdir ", tempFolder, "\n",
               "export TMPDIR=", tempFolder, "\n",
               "export BLASTMAT=/opt/bio/ncbi/data/\n",
               "time parallel_identify_chimeric_seqs.py -i ", repSeq, " -t ", refTaxonomy, " -r ", 
               refFasta, " -m blast_fragments -o ", chimericList, " -O ", threads, 
               "\nrm -r ", tempFolder, sep = "" )
-MakeJobs(cmd, prefix, threads, 5000, 172800, "yes")
+MakeJobs(cmd, prefix_I, threads, 5000, 172800, "yes")
 ```
 run jobs by running jobsub_all.job:
 ```{r}
-system(paste("jobsub ", sharedPathAn, prefix, "/", "jobsub_all.job", sep = ""))
-# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.e*", sep = "")) #remove error files
-# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.o*", sep = "")) #remove output files
+system(paste("jobsub ", sharedPathAn, prefix_I, "/", "jobsub_all.job", sep = ""))
+# system(paste("rm  ", sharedPathAn, prefix_I, "/", "*.job.e*", sep = "")) #remove error files
+# system(paste("rm  ", sharedPathAn, prefix_I, "/", "*.job.o*", sep = "")) #remove output files
 ```
 
 PIPELINE STEP J: J_remove_chimeric_seqs --> I/J steps are optional*
 
 ```{r}
-prefix <- "J_remove_chimeric_seqs"
-repSeqNoChimera <-paste (sharedPathAn, prefix, "/", subsetHeader, "_representative_seqs_noChimera.fasta" , sep = "")
+prefix_J <- "J_remove_chimeric_seqs"
+repSeqNoChimera <-paste (sharedPathAn, prefix_J, "/", subsetHeader, "_representative_seqs_noChimera.fasta" , sep = "")
 cmd <- paste ("time filter_fasta.py -f ", repSeq, " -o ", repSeqNoChimera, " -s ", chimericList, " -n", sep="")
-MakeJobs(cmd, prefix, 1, 3000, 172800, "yes")
+MakeJobs(cmd, prefix_J, 1, 3000, 172800, "yes")
 ```
 
 run jobs by running jobsub_all.job:
 ```{r}
-system(paste("jobsub ", sharedPathAn, prefix, "/", "jobsub_all.job", sep = ""))
-# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.e*", sep = "")) #remove error files
-# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.o*", sep = "")) #remove output files
+system(paste("jobsub ", sharedPathAn, prefix_J, "/", "jobsub_all.job", sep = ""))
+# system(paste("rm  ", sharedPathAn, prefix_J, "/", "*.job.e*", sep = "")) #remove error files
+# system(paste("rm  ", sharedPathAn, prefix_J, "/", "*.job.o*", sep = "")) #remove output files
 ```
 
 --> I/J steps are optional*: snakemake v 0.1 does not have this step, but was later added (v0.4). 
@@ -665,10 +665,10 @@ PIPELINE STEP K: K_classify
 Assign taxonomy with confidence of 0.70 as per snakemake suggestion
 
 ```{r}
-prefix <- "K_classify" ## running tests with a different command 
-tempFolder <- paste(sharedPathAn, prefix, "/", "mytemp", sep= "")
+prefix_K <- "K_classify" ## running tests with a different command 
+tempFolder <- paste(sharedPathAn, prefix_K, "/", "mytemp", sep= "")
 if (file.exists(repSeqNoChimera)){
-  inputFasta <- repSeqNoChimera
+  inputFasta <- repSeqNoChimera   
 } else {
   inputFasta <- repSeq
 }
@@ -677,21 +677,21 @@ threads <- "4"
 cmd <- paste ("mkdir ", tempFolder, "\n",
               "export TMPDIR=", tempFolder, "\n",
               "time parallel_assign_taxonomy_rdp.py -i ", inputFasta, " -r ", refFasta, " -t ", refTaxonomy, 
-               " -c ", classifyConfidence, " -o ", sharedPathAn, prefix, " --rdp_max_memory 10000 -O ", threads,  
+               " -c ", classifyConfidence, " -o ", sharedPathAn, prefix_K, " --rdp_max_memory 10000 -O ", threads,  
               #sep = "" )
               "\nrm -r ", tempFolder, sep = "" )
 # UNCOMMENT THE NEXT COMAND IF MOTHUR IS PREFERED INSTEAD OF PARALLEL RDP
 #cmd <- paste ("time assign_taxonomy.py -i ", inputFasta, " -m mothur -r ", refFasta, " -t ", refTaxonomy, 
-#             " -c ", classifyConfidence, " -o ", prefix, sep = "" )
-MakeJobs(cmd, prefix, threads, 5000, 172800, "yes")
-taxAssignments <- paste (sharedPathAn, prefix, "/", gsub(".fasta", "_tax_assignments.txt", basename(inputFasta)), sep="" )
+#             " -c ", classifyConfidence, " -o ", prefix_K, sep = "" )
+MakeJobs(cmd, prefix_K, threads, 10000, 172800, "yes")
+taxAssignments <- paste (sharedPathAn, prefix_K, "/", gsub(".fasta", "_tax_assignments.txt", basename(inputFasta)), sep="" )
 ```
 
 run jobs by running jobsub_all.job:
 ```{r}
-system(paste("jobsub ", sharedPathAn, prefix, "/", "jobsub_all.job", sep = ""))
-# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.e*", sep = "")) #remove error files
-# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.o*", sep = "")) #remove output files
+system(paste("jobsub ", sharedPathAn, prefix_K, "/", "jobsub_all.job", sep = ""))
+# system(paste("rm  ", sharedPathAn, prefix_K, "/", "*.job.e*", sep = "")) #remove error files
+# system(paste("rm  ", sharedPathAn, prefix_K, "/", "*.job.o*", sep = "")) #remove output files
 ```
 
 PIPELINE STEP L: L_make_otu 
@@ -701,17 +701,17 @@ Biom file: the columns correspond to Samples and rows correspond to OTUs
 and the number of times a sample appears in a particular OTU
 
 ```{r}
-prefix <- "L_make_otu"
-biomTable <- paste (sharedPathAn, prefix, "/", subsetHeader, "_otu_table.biom", sep="")
+prefix_L <- "L_make_otu"
+biomTable <- paste (sharedPathAn, prefix_L, "/", subsetHeader, "_otu_table.biom", sep="")
 cmd <- paste ("make_otu_table.py -i ", pickOtutxt, " -t ", taxAssignments, " -o ", biomTable, sep="")
-MakeJobs(cmd, prefix, 1, 3000, 172800, "yes")
+MakeJobs(cmd, prefix_L, 1, 3000, 172800, "yes")
 ```
 
 run jobs by running jobsub_all.job:
 ```{r}
-system(paste("jobsub ", sharedPathAn, prefix, "/", "jobsub_all.job", sep = ""))
-# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.e*", sep = "")) #remove error files
-# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.o*", sep = "")) #remove output files
+system(paste("jobsub ", sharedPathAn, prefix_L, "/", "jobsub_all.job", sep = ""))
+# system(paste("rm  ", sharedPathAn, prefix_L, "/", "*.job.e*", sep = "")) #remove error files
+# system(paste("rm  ", sharedPathAn, prefix_L, "/", "*.job.o*", sep = "")) #remove output files
 ```
 
 PIPELINE STEP M: M_convert_otu_table 
@@ -719,17 +719,17 @@ PIPELINE STEP M: M_convert_otu_table
 Convert OTU table in biom format to tab-delimited table format.
 
 ```{r}
-prefix <- "M_convert_otu_table"
-otuTable <- paste (sharedPathAn, prefix, "/", gsub(".biom", ".otu", basename(biomTable)), sep="" )
+prefix_M <- "M_convert_otu_table"
+otuTable <- paste (sharedPathAn, prefix_M, "/", gsub(".biom", ".otu", basename(biomTable)), sep="" )
 cmd <- paste("biom convert -i ", biomTable, " -o ", otuTable, " --to-tsv --header-key taxonomy", sep="")
-MakeJobs(cmd, prefix, 1, 3000, 172800, "yes")
+MakeJobs(cmd, prefix_M, 1, 3000, 172800, "yes")
 ```
 
 run jobs by running jobsub_all.job:
 ```{r}
-system(paste("jobsub ", sharedPathAn, prefix, "/", "jobsub_all.job", sep = ""))
-# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.e*", sep = "")) #remove error files
-# system(paste("rm  ", sharedPathAn, prefix, "/", "*.job.o*", sep = "")) #remove output files
+system(paste("jobsub ", sharedPathAn, prefix_M, "/", "jobsub_all.job", sep = ""))
+# system(paste("rm  ", sharedPathAn, prefix_M, "/", "*.job.e*", sep = "")) #remove error files
+# system(paste("rm  ", sharedPathAn, prefix_M, "/", "*.job.o*", sep = "")) #remove output files
 ```
 
 
