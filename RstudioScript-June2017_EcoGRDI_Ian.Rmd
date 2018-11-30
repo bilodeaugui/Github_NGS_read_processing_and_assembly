@@ -538,70 +538,72 @@ metadataAdapRM$fastaTrimAdapRem <- paste(metadataAdapRM$pathFastq, metadataAdapR
 
 PIPELINE STEP G: G_pick_otus (CLUSTERING)
 
-step 1 (optional): if desired, subset the data before clustering:
-
-```{r}
-subData <- subset(metadataAdapRM, Region == "16S") #choosing only 16S
-#subData <- subset(sub_data, Sample == "soil") #choosing only soil samples
-subsetHeader <- "16S" # create a header for the type of subsetting IF NO SUBSETTING USE ALL
-```
-step 2.1: create a single fasta file with all sequences to cluster and rename the fasta headers
+step 1: create a single fasta file with all sequences to cluster and rename the fasta headers
 (into qiime acceptable headers)
 
 ```{r}
 prefix_G <- "G_pick_otus"
 dir.create(paste(sharedPathAn, prefix_G, sep = ""), showWarnings = TRUE, recursive = FALSE) 
-mergedFasta <- paste(sharedPathAn, prefix_G,  "/", subsetHeader, "_adapRemMerged_trimmomatic_unsorted.fasta", sep= "")
-for(name in subData$LibraryName) { 
-  newSampleName <- gsub("_", "-", name)
-  print(newSampleName)
-  system(paste("sed \'s/^>[:alnum:]*/>", newSampleName, "_/\' ", 
-               sharedPathAn, seqDataDir, "/", name,  ".adapRemMerged_trimmomatic.fasta >> ", 
-               mergedFasta, sep = ""))
+dir.create(paste(sharedPathAn, "OTU_tables", sep = ""), showWarnings = TRUE, recursive = FALSE) 
+notesAn <- paste(sharedPathAn, "OTU_tables/", sep = "")
+cmds <- c()
+for (region in unique(metadataAdapRM$Region)){
+  subData <- subset(metadataAdapRM, Region == region) 
+  mergedFasta <- paste(sharedPathAn, prefix_G,  "/", region, "_adapRemMerged_trimmomatic_unsorted.fasta", sep= "")
+  for(name in subData$LibraryName) { 
+    subData$qiimeName <- gsub("_", "-", subData$LibraryName) #replace underscores with dash for qiime
+    newSampleName <- gsub("_", "-", name)
+    system(paste("sed \'s/^>[:alnum:]*/>", newSampleName, "_/\' ",
+                 sharedPathAn, seqDataDir, "/", name,  ".adapRemMerged_trimmomatic.fasta >> ",
+                 mergedFasta, sep = ""))
+  }
+  
+  cmd <- paste ("pick_otus.py -i ", mergedFasta ," -m uclust -s 0.97 -o ", sharedPathAn, prefix_G, sep = "")
+  cmds <- c(cmds, cmd)
+  subData$qiimeName <- gsub("_", "-", subData$LibraryName) #replace underscores with dash for qiime
+  write.csv(subData, file = paste(sharedPathAn, "OTU_tables", "/", region,"-metadata.csv", sep = "")) 
+  system(paste("echo 'pick_otus.py\n\tmethod: uclust\n\tsimilarity threshold: 0.97' > ", notesAn, region, "-analysis-notes.txt" , sep=""))
+  
 }
+MakeJobs(cmds, prefix_G, 4, 3000, 172800, "yes")
 ```
 
-step 2.2: add qiime header name to metadata (subData)
-
-```{r}
-subData$qiimeName <- gsub("_", "-", subData$LibraryName) #replace underscores with dash for qiime
-```
-
-step3: create jobsub  for qiime pick_otu
-
-```{r}
-prefix_G <- "G_pick_otus"
-cmd <- paste ("pick_otus.py -i ", mergedFasta ," -m uclust -s 0.97 -o ", sharedPathAn, prefix_G, sep = "")
-MakeJobs(cmd, prefix_G, 4, 3000, 172800, "yes")
-```
 run jobs by running jobsub_all.job
 
 ```{r}
 system(paste("jobsub ", sharedPathAn, prefix_G, "/", "jobsub_all.job", sep = ""))
-# system(paste("rm  ", sharedPathAn, prefix_G, "/", "*.job.e*", sep = "")) #remove error files
-# system(paste("rm  ", sharedPathAn, prefix_G, "/", "*.job.o*", sep = "")) #remove output files
+system(paste("rm  ", sharedPathAn, prefix_G, "/", "*.job.e*", sep = "")) #remove error files
+system(paste("rm  ", sharedPathAn, prefix_G, "/", "*.job.o*", sep = "")) #remove output files
 ```
 
-Add more info to the qiime log and write metadata csv that is relevant to the analysis
+step 2: Add more info to the qiime log and write metadata csv that is relevant to the analysis
+
 ```{r}
-pickOtuVersion <- system("pick_otus.py --version", intern = TRUE)
-pickOtuLog <- gsub(".fasta", "_otus.log", mergedFasta)
-system (paste("echo \'\nInput file: ", mergedFasta, "\' >> ", pickOtuLog , sep = "")) #add input file to log
-system (paste("echo \'Data subsetting: ", subsetHeader, "\' >> ", pickOtuLog , sep = "")) #add subsetting type that was used to prepare fasta file
-system (paste("echo \'Metadata: ", subsetHeader, "-metadata.csv\' >> ", pickOtuLog , sep = "")) #add subsetting type that was used to prepare fasta file
-system (paste("echo \'", pickOtuVersion, "\' >> ", pickOtuLog , sep = "")) #add version to log
-system (paste("echo \'", Sys.time(), "\' >> ", pickOtuLog , sep = "")) #add time to log
-write.csv(subData, file = paste(sharedPathAn, prefix_G, "/", subsetHeader,"-metadata.csv", sep = ""))
+for (region in unique(metadataAdapRM$Region)){
+  mergedFasta <- paste(sharedPathAn, prefix_G,  "/", region, "_adapRemMerged_trimmomatic_unsorted.fasta", sep= "")
+  pickOtuVersion <- system("pick_otus.py --version", intern = TRUE)
+  pickOtuLog <- gsub(".fasta", "_otus.log", mergedFasta)
+  system (paste("echo \'\nInput file: ", mergedFasta, "\' >> ", pickOtuLog , sep = "")) #add input file to log
+  system (paste("echo \'Metadata: ", region, "-metadata.csv\' >> ", pickOtuLog , sep = "")) #add subsetting type that was used to prepare fasta file
+  system (paste("echo \'", pickOtuVersion, "\' >> ", pickOtuLog , sep = "")) #add version to log
+  system (paste("echo \'", Sys.time(), "\' >> ", pickOtuLog , sep = "")) #add time to log
+}
 ```
 
 PIPELINE STEP H: H_pick_representatives 
 
 ```{r}
-pickOtutxt <- gsub(".fasta", "_otus.txt", mergedFasta)
 prefix_H <- "H_pick_representatives"
-repSeq <- paste (sharedPathAn, prefix_H, "/", subsetHeader, "_representative_seqs_set.fasta" , sep = "")
-cmd <- paste("pick_rep_set.py -i ", pickOtutxt, " -f ", mergedFasta, " -m longest -o ", repSeq , sep = "")
-MakeJobs(cmd, prefix_H, 4, 1800, 172800, "yes")
+cmds <- c()
+for (region in unique(metadataAdapRM$Region)){
+  mergedFasta <- paste(sharedPathAn, prefix_G,  "/", region, "_adapRemMerged_trimmomatic_unsorted.fasta", sep= "")
+  pickOtutxt <- gsub(".fasta", "_otus.txt", mergedFasta)
+  repSeq <- paste (sharedPathAn, prefix_H, "/", region, "_representative_seqs_set.fasta" , sep = "")
+  cmd <- paste("pick_rep_set.py -i ", pickOtutxt, " -f ", mergedFasta, " -m longest -o ", repSeq , sep = "")
+  cmds <- c(cmds, cmd)
+  system(paste("echo 'pick_rep_set.py\n\tmethod: longest' >> ", notesAn, region, "-analysis-notes.txt" , sep=""))
+}
+MakeJobs(cmds, prefix_H, 4, 1800, 172800, "yes")
 ```
 
 run jobs by running jobsub_all.job:
@@ -617,20 +619,64 @@ Removing chimeric sequences is suggested in most workflows. Snakemake v0.4 sugge
 Have to set a variable: $ export BLASTMAT=/opt/bio/ncbi/data/ so that blast works.
 Note: Reference files are provided in the training modules, this is a 16S reference database
 
+DEFINE REFERENCE DATABASE SETTINGS
+```{r}
+database_16S <- "SILVA" #greengenes or SILVA
+#SILVA DATABASE SETTINGS
+SILVA_tax_type <- "consensus" #consensus, majority or none
+SILVA_tax_levels <- "all" # 7 or all 
+SILVA_identity <- "97" # 90, 94, 97 or 99
+UNITE_identity <- "97" #97, 99 or dynamic
+```
+
 ```{r}
 prefix_I <- "I_identify_chimeric_seqs"
-refFasta <- "/space/project/grdi/eco/training/20170223/pipeline/snakemake-workflows-0.2/greengenes_97_otus.fasta"
-refTaxonomy <- "/space/project/grdi/eco/training/20170223/pipeline/snakemake-workflows-0.2/greengenes_97_otu_taxonomy.txt"
-chimericList <- paste(sharedPathAn, prefix_I, "/", subsetHeader, "_chimera_list.txt" , sep="")
 threads <- "4"
 tempFolder <- paste(sharedPathAn, prefix_I, "/", "mytemp", sep= "")
-cmd <- paste ("mkdir ", tempFolder, "\n",
-              "export TMPDIR=", tempFolder, "\n",
-              "export BLASTMAT=/opt/bio/ncbi/data/\n",
-              "time parallel_identify_chimeric_seqs.py -i ", repSeq, " -t ", refTaxonomy, " -r ", 
-              refFasta, " -m blast_fragments -o ", chimericList, " -O ", threads, 
-              "\nrm -r ", tempFolder, sep = "" )
-MakeJobs(cmd, prefix_I, threads, 5000, 172800, "yes")
+cmds <- c()
+
+for (region in unique(metadataAdapRM$Region)){
+  rm(refFasta)
+  rm(refTaxonomy)
+  if (region == "16S" & database_16S == "greengenes"){
+    refFasta <- "/space/project/grdi/eco/training/20170223/pipeline/snakemake-workflows-0.2/greengenes_97_otus.fasta"
+    refTaxonomy <- "/space/project/grdi/eco/training/20170223/pipeline/snakemake-workflows-0.2/greengenes_97_otu_taxonomy.txt"
+  } 
+  if (region == "16S" & database_16S == "SILVA"){
+    refFasta <- paste ("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/databases/SILVA_132_QIIME_release/",
+                       "rep_set/rep_set_16S_only/", SILVA_identity ,"/silva_132_", SILVA_identity,  "_16S.fna", sep = "")
+    refTaxonomy <- paste ("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/databases/SILVA_132_QIIME_release/",
+                          "taxonomy/16S_only/", SILVA_identity, "/", SILVA_rep_type, "_taxonomy_", SILVA_tax_levels, "_levels.txt", sep = "")
+  } 
+  if (region == "18S"){
+    refFasta <- paste ("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/databases/SILVA_132_QIIME_release/",
+                       "rep_set/rep_set_18S_only/", SILVA_identity ,"/silva_132_", SILVA_identity,  "_18S.fna", sep = "")
+    refTaxonomy <- paste ("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/databases/SILVA_132_QIIME_release/",
+                          "taxonomy/18S_only/", SILVA_identity, "/", SILVA_rep_type, "_taxonomy_", SILVA_tax_levels, "_levels.txt", sep = "")
+  }
+  if (region == "ITS"){
+    refFasta <- paste ("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/databases/UNITE",
+                       "/sh_refs_qiime_ver7_", UNITE_identity,  "_01.12.2017.fasta", sep ="")
+    refTaxonomy <- paste ("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/databases/UNITE",
+                       "/sh_taxonomy_qiime_ver7_", UNITE_identity,  "_01.12.2017.txt", sep ="")
+  }
+  if (region == "COI"){
+    print (paste("No reference database found for this region, ignoring: ", region, sep="" ))
+    next
+  }
+  repSeq <- paste (sharedPathAn, prefix_H, "/", region, "_representative_seqs_set.fasta" , sep = "")
+  chimericList <- paste(sharedPathAn, prefix_I, "/", region, "_chimera_list.txt" , sep="")
+  cmd <- paste ("mkdir ", tempFolder, "\n",
+                "export TMPDIR=", tempFolder, "\n",
+                "export BLASTMAT=/opt/bio/ncbi/data/\n",
+                "time parallel_identify_chimeric_seqs.py -i ", repSeq, " -t ", refTaxonomy, " -r ", 
+                refFasta, " -m blast_fragments -o ", chimericList, " -O ", threads, 
+                "\nrm -r ", tempFolder, sep = "" )
+  cmds <- c(cmds, cmd)
+  system(paste("echo 'parallel_identify_chimeric_seqs.py method: blast\n\treference sequences: ", 
+               refFasta, "\n\treference taxonomy: ", refTaxonomy, "' >> ", notesAn, region, "-analysis-notes.txt" , sep=""))
+}
+MakeJobs(cmds, prefix_I, threads, 8000, 172800, "yes")
 ```
 run jobs by running jobsub_all.job:
 ```{r}
@@ -643,9 +689,16 @@ PIPELINE STEP J: J_remove_chimeric_seqs --> I/J steps are optional*
 
 ```{r}
 prefix_J <- "J_remove_chimeric_seqs"
-repSeqNoChimera <-paste (sharedPathAn, prefix_J, "/", subsetHeader, "_representative_seqs_noChimera.fasta" , sep = "")
-cmd <- paste ("time filter_fasta.py -f ", repSeq, " -o ", repSeqNoChimera, " -s ", chimericList, " -n", sep="")
-MakeJobs(cmd, prefix_J, 1, 3000, 172800, "yes")
+cmds <- c()
+
+for (region in c("16S", "18S", "ITS")){    #hard coded this because we dont have a ref sequences yet
+  repSeq <- paste (sharedPathAn, prefix_H, "/", region, "_representative_seqs_set.fasta" , sep = "")
+  repSeqNoChimera <-paste (sharedPathAn, prefix_J, "/", region, "_representative_seqs_noChimera.fasta" , sep = "")
+  chimericList <- paste(sharedPathAn, prefix_I, "/", region, "_chimera_list.txt" , sep="")
+  cmd <- paste ("time filter_fasta.py -f ", repSeq, " -o ", repSeqNoChimera, " -s ", chimericList, " -n", sep="")
+  cmds <- c(cmds, cmd)
+}
+MakeJobs(cmds, prefix_J, 1, 3000, 172800, "yes")
 ```
 
 run jobs by running jobsub_all.job:
@@ -666,25 +719,38 @@ Assign taxonomy with confidence of 0.70 as per snakemake suggestion
 
 ```{r}
 prefix_K <- "K_classify" ## running tests with a different command 
-tempFolder <- paste(sharedPathAn, prefix_K, "/", "mytemp", sep= "")
-if (file.exists(repSeqNoChimera)){
-  inputFasta <- repSeqNoChimera   
-} else {
-  inputFasta <- repSeq
-}
 classifyConfidence <- "0.70"
 threads <- "4"
-cmd <- paste ("mkdir ", tempFolder, "\n",
-              "export TMPDIR=", tempFolder, "\n",
-              "time parallel_assign_taxonomy_rdp.py -i ", inputFasta, " -r ", refFasta, " -t ", refTaxonomy, 
-               " -c ", classifyConfidence, " -o ", sharedPathAn, prefix_K, " --rdp_max_memory 10000 -O ", threads,  
-              #sep = "" )
-              "\nrm -r ", tempFolder, sep = "" )
-# UNCOMMENT THE NEXT COMAND IF MOTHUR IS PREFERED INSTEAD OF PARALLEL RDP
-#cmd <- paste ("time assign_taxonomy.py -i ", inputFasta, " -m mothur -r ", refFasta, " -t ", refTaxonomy, 
-#             " -c ", classifyConfidence, " -o ", prefix_K, sep = "" )
-MakeJobs(cmd, prefix_K, threads, 10000, 172800, "yes")
-taxAssignments <- paste (sharedPathAn, prefix_K, "/", gsub(".fasta", "_tax_assignments.txt", basename(inputFasta)), sep="" )
+tempFolder <- paste(sharedPathAn, prefix_K, "/", "mytemp", sep= "")
+cmds <- c()
+
+for (region in c("16S", "18S", "ITS")){
+  repSeq <- paste (sharedPathAn, prefix_H, "/", region, "_representative_seqs_set.fasta" , sep = "")
+  repSeqNoChimera <-paste (sharedPathAn, prefix_J, "/", region, "_representative_seqs_noChimera.fasta" , sep = "")
+    if (file.exists(repSeqNoChimera)){ #in case chimera detection step was detected
+    inputFasta <- repSeqNoChimera   
+  } else {
+    inputFasta <- repSeq
+    print( paste(region, " representative sequences without chimeras not found, using: ", inputFasta, sep=""))
+  }
+  
+  refFasta <- system(paste("grep 'reference sequences' ", notesAn, region, "-analysis-notes.txt",
+                           " | cut -d ' ' -f 3", sep=""), intern = TRUE)
+  refTaxonomy <- system(paste("grep 'reference taxonomy' ", notesAn, region, "-analysis-notes.txt",
+                           " | cut -d ' ' -f 3", sep=""), intern = TRUE)
+  cmd <- paste ("mkdir ", tempFolder, "\n",
+                "export TMPDIR=", tempFolder, "\n",
+                "time parallel_assign_taxonomy_rdp.py -i ", inputFasta, " -r ", refFasta, " -t ", refTaxonomy, 
+                 " -c ", classifyConfidence, " -o ", sharedPathAn, prefix_K, " --rdp_max_memory 10000 -O ", threads,  
+                #sep = "" )
+                "\nrm -r ", tempFolder, sep = "" )
+  cmds <- c(cmds, cmd)
+  system(paste("echo 'parallel_assign_taxonomy_rdp.py\n\tmethod: RDP classifier\n\tinput fasta: ", inputFasta, "\n\treference sequences: ", 
+               refFasta, "\n\treference taxonomy: ", refTaxonomy, "\n\tconfidence: ", classifyConfidence, "' >> ", notesAn, region, "-analysis-notes.txt" , sep=""))
+
+}
+MakeJobs(cmds, prefix_K, threads, 10000, 172800, "yes")
+
 ```
 
 run jobs by running jobsub_all.job:
@@ -702,9 +768,19 @@ and the number of times a sample appears in a particular OTU
 
 ```{r}
 prefix_L <- "L_make_otu"
-biomTable <- paste (sharedPathAn, prefix_L, "/", subsetHeader, "_otu_table.biom", sep="")
-cmd <- paste ("make_otu_table.py -i ", pickOtutxt, " -t ", taxAssignments, " -o ", biomTable, sep="")
-MakeJobs(cmd, prefix_L, 1, 3000, 172800, "yes")
+cmds <- c()
+
+for (region in c("16S", "18S", "ITS")){
+  pickOtutxt <- paste(sharedPathAn, prefix_G,  "/", region, "_adapRemMerged_trimmomatic_unsorted_otus.txt", sep="")
+  inputFasta <- system(paste("grep 'input fasta' ", notesAn, region, "-analysis-notes.txt",
+                           " | cut -d ' ' -f 3", sep=""), intern = TRUE)
+  taxAssignments <- paste (sharedPathAn, prefix_K, "/", gsub(".fasta", "_tax_assignments.txt", basename(inputFasta)), sep="" )
+  biomTable <- paste (notesAn, region, "_otu_table.biom", sep="")
+  cmd <- paste ("make_otu_table.py -i ", pickOtutxt, " -t ", taxAssignments, " -o ", biomTable, sep="")
+  cmds <- c(cmds, cmd)
+  
+}
+MakeJobs(cmds, prefix_L, 1, 3000, 172800, "yes")
 ```
 
 run jobs by running jobsub_all.job:
@@ -720,9 +796,16 @@ Convert OTU table in biom format to tab-delimited table format.
 
 ```{r}
 prefix_M <- "M_convert_otu_table"
-otuTable <- paste (sharedPathAn, prefix_M, "/", gsub(".biom", ".otu", basename(biomTable)), sep="" )
-cmd <- paste("biom convert -i ", biomTable, " -o ", otuTable, " --to-tsv --header-key taxonomy", sep="")
-MakeJobs(cmd, prefix_M, 1, 3000, 172800, "yes")
+cmds <- c()
+
+for (region in c("16S", "18S", "ITS")){
+  biomTable <- paste (notesAn, region, "_otu_table.biom", sep="")
+  otuTable <- paste (notesAn, region, "_otu_table.otu", sep="")
+  cmd <- paste("biom convert -i ", biomTable, " -o ", otuTable, " --to-tsv --header-key taxonomy", sep="")
+  cmds <- c(cmds, cmd)
+}
+MakeJobs(cmds, prefix_M, 1, 3000, 172800, "yes")
+
 ```
 
 run jobs by running jobsub_all.job:
