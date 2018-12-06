@@ -1,0 +1,148 @@
+---
+title: "ecoGRDI_downstream_processing"
+author: "Beatriz"
+date: "December 4, 2018"
+output: html_document
+---
+
+FOR DOWNSTREAM ANALYSES, CREATE TREE, MAPPING FILE and SCRIPT.SH FOR VISUALIZATIONS
+
+CONVERT METADATA CSV TO .TXT MAPPING FILE
+This file is required for downstream analyses in qiime
+
+```{r}
+#home <- ("/fs/hnas1-evs1/Dgrdi/grdi_eco/groups/bilodeaug/gir001/PIRL_working/ecoBiomics_Ian/")
+sharedPathAn <- "/fs/hnas1-evs1/Dgrdi/grdi_eco/groups/bilodeaug/gir001/PIRL_working/ecoBiomics_Ian/"
+```
+
+```{r}
+library(dplyr)
+for (region in c("16S", "18S", "ITS", "COI")){
+  metadata <- read.csv( paste(sharedPathAn, "OTU_tables/", region, "-metadata.csv", sep=""))
+  mappingFile <- select(metadata, qiimeName, Region, Sample, Provider, Experiment, ExtractionKit)
+  mappingFile$Barcode <- ("AGCACGAGCCTA") #from Qiime example, we will NOT use this, but need to have it 
+  mappingFile$LinkerPrimer <- ("YATGCTGCCTCCCGTAGGAGT") #from Qiime example, we will NOT use this, but need to have it
+  mappingFile$Comment <- ("fake barcode and linker primer")
+  mappingFile <- mappingFile[,c(1,7,8,2:6, 9)]
+  colnames(mappingFile)[(names(mappingFile) == "qiimeName")] <- "#SampleID"
+  write.table(mappingFile, paste(sharedPathAn, "OTU_tables/", region, "-mapping-file.txt", sep=""), sep="\t", row.names = F, quote = F) 
+}
+```
+
+ALIGN AND CREATE TREE
+This is for 16S and 18S, since the ITS doenst have an alignment 
+(because it is highly variable)
+I think that my choice for -e and -g came from this tutorial:
+http://www.metagenomics.wiki/tools/16s/qiime/otu-clustering/silva
+
+```{r}
+dir.create(paste(sharedPathAn, "trees", sep = ""), showWarnings = TRUE, recursive = FALSE) 
+tempFolder <- paste(sharedPathAn, "trees", "/", "mytemp", sep= "")
+threads <- "2"
+database16S <- "SILVA"
+cmds <- c()
+
+
+for (region in c("16S", "18S")){
+  inputFasta <- system(paste("grep 'input fasta' ", sharedPathAn, "OTU_tables/", region, "-analysis-notes.txt",
+                           " | cut -d ' ' -f 3", sep=""), intern = TRUE)
+  refFasta <- system(paste("grep 'reference sequences' ", sharedPathAn, "OTU_tables/", region, "-analysis-notes.txt",
+                           " | cut -d ' ' -f 3", sep=""), intern = TRUE)
+  alignedFasta <- paste (sharedPathAn, "trees", "/", gsub(".fasta", "_aligned.fasta", basename(inputFasta)), sep="" )
+
+  if ( (region == "16S" & database16S == "SILVA") || region == "18S"){
+    template <- paste(" -t ", 
+                      "/fs/hnas1-evs1/Dgrdi/grdi_eco/groups/bilodeaug/gir001/PIRL_working/References/databases/SILVA_132_QIIME_release/core_alignment/80_core_alignment.fna", sep = "")
+  } else {
+    template <- ""
+  }
+  cmd <- paste ("mkdir ", tempFolder, "\n",
+                "export TMPDIR=", tempFolder, "\n",
+                "time parallel_align_seqs_pynast.py -i ", inputFasta, 
+                " -o ", sharedPathAn, "trees/", " -O ", threads, template,
+                "\nfilter_alignment.py -i ", alignedFasta,
+                " -o ", sharedPathAn, "trees/", " -e 0.10 -g 0.80",
+                "\nmake_phylogeny.py -i ", gsub(".fasta", "_pfiltered.fasta", alignedFasta),
+                " -o", sharedPathAn, "trees/", region, ".tree",
+                "\nrm -r ", tempFolder, sep = "" )
+  cmds <- c(cmds, cmd)
+}
+MakeJobs(cmds, "trees", threads, 8000, 172800, "yes")
+
+```
+
+Run jobs separately to avoid issues with temp directory
+```{r}
+system(paste("jobsub ", sharedPathAn, "trees", "/", "trees1.job", sep = ""))
+system(paste("jobsub ", sharedPathAn, "trees", "/", "trees2.job", sep = ""))
+
+```
+
+CREATE DOWNSTREAM SCRIPTS TO BE RUN IN LOCAL COMPUTER FOR VISUALIZATIONS
+
+This creates a script.sh to be run locally to produce all the plots. 
+The script needs to be run locally because the 'matplotlib' version in the GPSC is not the righ one for qiime.
+To install qiime in the local computer:
+
+1. install conda
+2. conda create -n qiime1 python=2.7 qiime matplotlib=1.4.3 mock nose -c bioconda
+
+To obtain the location of conda in your local computer use "which conda"
+and use that in the variable "localConda" bellow. 
+
+```{r}
+localConda <- "/home/lujantorob/anaconda3/bin/activate" 
+system( paste ("mkdir ", sharedPathAn, "OTU_tables/downstream_processing", sep=""))
+script <- paste(sharedPathAn, "OTU_tables/downstream_processing", "/script.sh", sep="")
+system (paste("echo \'#!/bin/bash\' > ", script , sep = "")) #create bash script
+system (paste("echo \'source ", localConda, " qiime1\' >> ", script , sep = "")) #activate environment w script
+for (region in c("16S", "18S", "ITS")){
+  for (category in c("Sample", "ExtractionKit")) {
+    summarizeAll <- paste("summarize_taxa_through_plots.py -i ", region, "_otu_table.biom -o ", region, "-summary-", category, 
+                          " -m ", region, "-mapping-file.txt -c ", category , sep = "")
+    system( paste ("echo \'echo running ", region, " ", category, " summary\' >> ", script, sep=""))
+    system (paste("echo \'", summarizeAll, "\' >> ", script , sep = ""))
+    
+  }
+    if (region == "ITS") {
+      #use bray_curtis
+      betaDiversity <- paste("beta_diversity.py -i ITS_otu_table.biom -o ITS-beta -m bray_curtis\n",
+                             "principal_coordinates.py -i ITS-beta/bray_curtis_ITS_otu_table.txt -o ITS-beta/pcoa_bray_curtis_ITS_otu_table.txt\n", 
+                             "make_emperor.py -i ITS-beta/pcoa_bray_curtis_ITS_otu_table.txt -o ITS-3D-bc -m ITS-mapping-file.txt", sep = "")
+      coreDiversity <- paste("core_diversity_analyses.py -i ITS_otu_table.biom -o ITS-core-output-200 -m ",
+                             "ITS-mapping-file.txt -c ExtractionKit,Sample --nonphylogenetic_diversity -e 200", sep = "")
+      coreDiversity2 <- paste("core_diversity_analyses.py -i ITS_otu_table.biom -o ITS-core-output-1000 -m ",
+                             "ITS-mapping-file.txt -c ExtractionKit,Sample --nonphylogenetic_diversity -e 1000", sep = "")
+      
+      
+    } else{
+      #use unifrac
+      betaDiversity <- paste("beta_diversity_through_plots.py -i ", region, " -o ", region, "-beta", 
+                             "_otu_table.biom -t ",
+                             region, ".tree", " -m ", region, "-mapping-file.txt", sep = "")
+      coreDiversity <- paste("core_diversity_analyses.py -i ", region, "_otu_table.biom -o ", region, "-core-output-200 -m ",
+                             region, "-mapping-file.txt -c ExtractionKit,Sample -t ", region, ".tree -e 200", sep = "")
+      coreDiversity2 <- paste("core_diversity_analyses.py -i ", region, "_otu_table.biom -o ", region, "-core-output-1000 -m ",
+                             region, "-mapping-file.txt -c ExtractionKit,Sample -t ", region, ".tree -e 1000", sep = "")
+    }
+  system( paste ("echo \'echo running ", region, " beta diversity\' >> ", script, sep=""))
+  system (paste("echo \'", betaDiversity, "\' >> ", script , sep = ""))
+  system( paste ("echo \'echo running ", region, " core diversity, sampling depth 200\' >> ", script, sep=""))
+  system (paste("echo \'", coreDiversity, "\' >> ", script , sep = ""))
+  system( paste ("echo \'echo running ", region, " core diversity, sampling depth 1000\' >> ", script, sep=""))
+  system (paste("echo \'", coreDiversity2, "\' >> ", script , sep = ""))
+}
+```
+
+This is to move everything needed for plots to a directory, zip it and move to home. 
+Use sftp to get the .zip file, unzip in the local computer and run script.sh
+$chmod +x script.sh
+$./script.sh
+
+```{r}
+system( paste ("cp ", sharedPathAn, "OTU_tables/*biom ", sharedPathAn, "OTU_tables/downstream_processing", sep=""))
+system( paste ("cp ", sharedPathAn, "OTU_tables/*mapping-file.txt ", sharedPathAn, "OTU_tables/downstream_processing", sep=""))
+system( paste ("cp ", sharedPathAn, "trees/*.tree ", sharedPathAn, "OTU_tables/downstream_processing", sep=""))
+system (paste ("zip -r ~/downstream_processing.zip ", sharedPathAn, "OTU_tables/downstream_processing", sep=""))
+system ( paste("rm -r ", sharedPathAn, "OTU_tables/downstream_processing", sep=""))
+```
