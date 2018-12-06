@@ -716,11 +716,12 @@ previous fasta file.
 PIPELINE STEP K: K_classify
 
 Assign taxonomy with confidence of 0.70 as per snakemake suggestion
+Changed from parallel_assign_taxonomy_rdp.py to assign_taxonomy.py -m rdp, 
+because it wasn't running easily in parallel. 
 
 ```{r}
 prefix_K <- "K_classify" ## running tests with a different command 
 classifyConfidence <- "0.70"
-threads <- "4"
 tempFolder <- paste(sharedPathAn, prefix_K, "/", "mytemp", sep= "")
 cmds <- c()
 
@@ -740,16 +741,16 @@ for (region in c("16S", "18S", "ITS")){
                            " | cut -d ' ' -f 3", sep=""), intern = TRUE)
   cmd <- paste ("mkdir ", tempFolder, "\n",
                 "export TMPDIR=", tempFolder, "\n",
-                "time parallel_assign_taxonomy_rdp.py -i ", inputFasta, " -r ", refFasta, " -t ", refTaxonomy, 
-                 " -c ", classifyConfidence, " -o ", sharedPathAn, prefix_K, " --rdp_max_memory 10000 -O ", threads,  
+                "time assign_taxonomy.py -m rdp -i ", inputFasta, " -r ", refFasta, " -t ", refTaxonomy, 
+                 " -c ", classifyConfidence, " -o ", sharedPathAn, prefix_K, " --rdp_max_memory 10000",  
                 #sep = "" )
                 "\nrm -r ", tempFolder, sep = "" )
   cmds <- c(cmds, cmd)
-  system(paste("echo 'parallel_assign_taxonomy_rdp.py\n\tmethod: RDP classifier\n\tinput fasta: ", inputFasta, "\n\treference sequences: ", 
+  system(paste("echo 'assign_taxonomy.py\n\tmethod: RDP classifier\n\tinput fasta: ", inputFasta, "\n\treference sequences: ", 
                refFasta, "\n\treference taxonomy: ", refTaxonomy, "\n\tconfidence: ", classifyConfidence, "' >> ", notesAn, region, "-analysis-notes.txt" , sep=""))
 
 }
-MakeJobs(cmds, prefix_K, threads, 10000, 172800, "yes")
+MakeJobs(cmds, prefix_K, 1, 10000, 172800, "yes")
 
 ```
 
@@ -814,5 +815,4 @@ system(paste("jobsub ", sharedPathAn, prefix_M, "/", "jobsub_all.job", sep = "")
 # system(paste("rm  ", sharedPathAn, prefix_M, "/", "*.job.e*", sep = "")) #remove error files
 # system(paste("rm  ", sharedPathAn, prefix_M, "/", "*.job.o*", sep = "")) #remove output files
 ```
-
 
