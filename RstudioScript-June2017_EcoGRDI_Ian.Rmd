@@ -661,8 +661,8 @@ for (region in unique(metadataAdapRM$Region)){
                        "/sh_taxonomy_qiime_ver7_", UNITE_identity,  "_01.12.2017.txt", sep ="")
   }
   if (region == "COI"){
-    print (paste("No reference database found for this region, ignoring: ", region, sep="" ))
-    next
+    refFasta <- "/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/rdp_training_sets/terrimporter/CO1_v3.2/mydata_training/mytrainseq_nh.fasta"
+    refTaxonomy <- "/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/rdp_training_sets/terrimporter/CO1_v3.2/mydata_training/mytrainseq_taxonomy.txt"
   }
   repSeq <- paste (sharedPathAn, prefix_H, "/", region, "_representative_seqs_set.fasta" , sep = "")
   chimericList <- paste(sharedPathAn, prefix_I, "/", region, "_chimera_list.txt" , sep="")
@@ -673,7 +673,7 @@ for (region in unique(metadataAdapRM$Region)){
                 refFasta, " -m blast_fragments -o ", chimericList, " -O ", threads, 
                 "\nrm -r ", tempFolder, sep = "" )
   cmds <- c(cmds, cmd)
-  system(paste("echo 'parallel_identify_chimeric_seqs.py method: blast\n\treference sequences: ", 
+  system(paste("echo 'parallel_identify_chimeric_seqs.py method: BLAST\n\treference sequences: ", 
                refFasta, "\n\treference taxonomy: ", refTaxonomy, "' >> ", notesAn, region, "-analysis-notes.txt" , sep=""))
 }
 MakeJobs(cmds, prefix_I, threads, 8000, 172800, "yes")
@@ -690,8 +690,7 @@ PIPELINE STEP J: J_remove_chimeric_seqs --> I/J steps are optional*
 ```{r}
 prefix_J <- "J_remove_chimeric_seqs"
 cmds <- c()
-
-for (region in c("16S", "18S", "ITS")){    #hard coded this because we dont have a ref sequences yet
+for (region in unique(metadataAdapRM$Region)){    
   repSeq <- paste (sharedPathAn, prefix_H, "/", region, "_representative_seqs_set.fasta" , sep = "")
   repSeqNoChimera <-paste (sharedPathAn, prefix_J, "/", region, "_representative_seqs_noChimera.fasta" , sep = "")
   chimericList <- paste(sharedPathAn, prefix_I, "/", region, "_chimera_list.txt" , sep="")
@@ -724,21 +723,33 @@ prefix_K <- "K_classify" ## running tests with a different command
 classifyConfidence <- "0.70"
 tempFolder <- paste(sharedPathAn, prefix_K, "/", "mytemp", sep= "")
 cmds <- c()
+threads <- "4"
 
-for (region in c("16S", "18S", "ITS")){
+for (region in unique(metadataAdapRM$Region)){
   repSeq <- paste (sharedPathAn, prefix_H, "/", region, "_representative_seqs_set.fasta" , sep = "")
   repSeqNoChimera <-paste (sharedPathAn, prefix_J, "/", region, "_representative_seqs_noChimera.fasta" , sep = "")
-    if (file.exists(repSeqNoChimera)){ #in case chimera detection step was detected
+  if (file.exists(repSeqNoChimera)){ #in case chimera detection step was detected
     inputFasta <- repSeqNoChimera   
   } else {
     inputFasta <- repSeq
     print( paste(region, " representative sequences without chimeras not found, using: ", inputFasta, sep=""))
   }
-  
   refFasta <- system(paste("grep 'reference sequences' ", notesAn, region, "-analysis-notes.txt",
                            " | cut -d ' ' -f 3", sep=""), intern = TRUE)
   refTaxonomy <- system(paste("grep 'reference taxonomy' ", notesAn, region, "-analysis-notes.txt",
                            " | cut -d ' ' -f 3", sep=""), intern = TRUE)
+  if (region == "COI") {
+    cmd <- paste ("mkdir ", tempFolder, "\n",
+              "export TMPDIR=", tempFolder, "\n",
+              "export BLASTMAT=/opt/bio/ncbi/data/\n",
+              "time parallel_assign_taxonomy_blast.py -i ", inputFasta, " -r ", refFasta, " -t ", refTaxonomy,
+              " -o ", sharedPathAn, prefix_K, " -O ", threads,
+              "\nrm -r ", tempFolder, sep = "" )
+    system(paste("echo 'parallel_assign_taxonomy_blast.py\n\tmethod: BLAST\n\tinput fasta: ", inputFasta, 
+                 refFasta, "\n\treference taxonomy: ", refTaxonomy, "' >> ", notesAn, region, "-analysis-notes.txt" , sep=""))
+    cmds <- c(cmds, cmd)
+    next()
+  }
   cmd <- paste ("mkdir ", tempFolder, "\n",
                 "export TMPDIR=", tempFolder, "\n",
                 "time assign_taxonomy.py -m rdp -i ", inputFasta, " -r ", refFasta, " -t ", refTaxonomy, 
@@ -750,7 +761,7 @@ for (region in c("16S", "18S", "ITS")){
                refFasta, "\n\treference taxonomy: ", refTaxonomy, "\n\tconfidence: ", classifyConfidence, "' >> ", notesAn, region, "-analysis-notes.txt" , sep=""))
 
 }
-MakeJobs(cmds, prefix_K, 1, 10000, 172800, "yes")
+MakeJobs(cmds, prefix_K, threads, 10000, 172800, "yes") #All will run with 4, although only necessary for COI
 
 ```
 
@@ -771,7 +782,7 @@ and the number of times a sample appears in a particular OTU
 prefix_L <- "L_make_otu"
 cmds <- c()
 
-for (region in c("16S", "18S", "ITS")){
+for (region in unique(metadataAdapRM$Region)){
   pickOtutxt <- paste(sharedPathAn, prefix_G,  "/", region, "_adapRemMerged_trimmomatic_unsorted_otus.txt", sep="")
   inputFasta <- system(paste("grep 'input fasta' ", notesAn, region, "-analysis-notes.txt",
                            " | cut -d ' ' -f 3", sep=""), intern = TRUE)
@@ -799,7 +810,7 @@ Convert OTU table in biom format to tab-delimited table format.
 prefix_M <- "M_convert_otu_table"
 cmds <- c()
 
-for (region in c("16S", "18S", "ITS")){
+for (region in unique(metadataAdapRM$Region)){
   biomTable <- paste (notesAn, region, "_otu_table.biom", sep="")
   otuTable <- paste (notesAn, region, "_otu_table.otu", sep="")
   cmd <- paste("biom convert -i ", biomTable, " -o ", otuTable, " --to-tsv --header-key taxonomy", sep="")
