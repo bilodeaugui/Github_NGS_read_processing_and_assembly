@@ -96,41 +96,68 @@ system( paste ("mkdir ", sharedPathAn, "OTU_tables/downstream_processing", sep="
 script <- paste(sharedPathAn, "OTU_tables/downstream_processing", "/script.sh", sep="")
 system (paste("echo \'#!/bin/bash\' > ", script , sep = "")) #create bash script
 system (paste("echo \'source ", localConda, " qiime1\' >> ", script , sep = "")) #activate environment w script
-for (region in c("16S", "18S", "ITS")){
+
+for (region in c("16S", "18S", "ITS", "COI")){
+  metadata <- read.csv( paste(sharedPathAn, "OTU_tables/", region, "-metadata.csv", sep=""))
+  samples <- unique(metadata$Sample)
+  biomTable <- paste (region, "_otu_table.biom", sep="")
+  mappingFile <-paste(region, "-mapping-file.txt", sep="")
+  
+  
+  system( paste ("echo \'###########", region, "###########\' >> ", script, sep=""))
   for (category in c("Sample", "ExtractionKit")) {
-    summarizeAll <- paste("summarize_taxa_through_plots.py -i ", region, "_otu_table.biom -o ", region, "-summary-", category, 
-                          " -m ", region, "-mapping-file.txt -c ", category , sep = "")
+    summarizeAll <- paste("summarize_taxa_through_plots.py -i ", biomTable, " -o ", region, "-summary-", category, 
+                          " -m ", mappingFile, " -c ", category , sep = "")
     system( paste ("echo \'echo running ", region, " ", category, " summary\' >> ", script, sep=""))
     system (paste("echo \'", summarizeAll, "\' >> ", script , sep = ""))
     
   }
-    if (region == "ITS") {
+    if (region == "ITS" || region == "COI") {
       #use bray_curtis
-      betaDiversity <- paste("beta_diversity.py -i ITS_otu_table.biom -o ITS-beta -m bray_curtis\n",
-                             "principal_coordinates.py -i ITS-beta/bray_curtis_ITS_otu_table.txt -o ITS-beta/pcoa_bray_curtis_ITS_otu_table.txt\n", 
-                             "make_emperor.py -i ITS-beta/pcoa_bray_curtis_ITS_otu_table.txt -o ITS-3D-bc -m ITS-mapping-file.txt", sep = "")
-      coreDiversity <- paste("core_diversity_analyses.py -i ITS_otu_table.biom -o ITS-core-output-200 -m ",
-                             "ITS-mapping-file.txt -c ExtractionKit,Sample --nonphylogenetic_diversity -e 200", sep = "")
-      coreDiversity2 <- paste("core_diversity_analyses.py -i ITS_otu_table.biom -o ITS-core-output-1000 -m ",
-                             "ITS-mapping-file.txt -c ExtractionKit,Sample --nonphylogenetic_diversity -e 1000", sep = "")
-      
-      
+      betaDiversity <- paste("beta_diversity.py -i ", biomTable, " -o ", region, "-beta -m bray_curtis\n",
+                             "principal_coordinates.py -i ", region, "-beta/bray_curtis_", region, "_otu_table.txt -o ", region, 
+                             "-beta/pcoa_bray_curtis_", region, "_otu_table.txt\n", 
+                             "make_emperor.py -i ", region, "-beta/pcoa_bray_curtis_", region, "_otu_table.txt -o ", 
+                             region, "-3D-bc -m ", mappingFile, sep = "")
+      coreDiversity200 <- paste("core_diversity_analyses.py -i ", biomTable, " -o ", region, "-core-output-200 -m ",
+                             mappingFile, " -c ExtractionKit,Sample --nonphylogenetic_diversity -e 200", sep = "")
+      coreDiversity1000 <- paste("core_diversity_analyses.py -i ", biomTable, " -o ", region, "-core-output-1000 -m ",
+                             mappingFile, " -c ExtractionKit,Sample --nonphylogenetic_diversity -e 1000", sep = "")
     } else{
       #use unifrac
-      betaDiversity <- paste("beta_diversity_through_plots.py -i ", region, " -o ", region, "-beta", 
-                             "_otu_table.biom -t ",
-                             region, ".tree", " -m ", region, "-mapping-file.txt", sep = "")
-      coreDiversity <- paste("core_diversity_analyses.py -i ", region, "_otu_table.biom -o ", region, "-core-output-200 -m ",
-                             region, "-mapping-file.txt -c ExtractionKit,Sample -t ", region, ".tree -e 200", sep = "")
-      coreDiversity2 <- paste("core_diversity_analyses.py -i ", region, "_otu_table.biom -o ", region, "-core-output-1000 -m ",
-                             region, "-mapping-file.txt -c ExtractionKit,Sample -t ", region, ".tree -e 1000", sep = "")
+      betaDiversity <- paste("beta_diversity_through_plots.py -i ", biomTable, " -o ", region, "-beta", 
+                             " -t ", region, ".tree", " -m ", region, "-mapping-file.txt", sep = "")
+      coreDiversity <- paste("core_diversity_analyses.py -i ", biomTable, " -o ", region, "-core-output-200 -m ",
+                             mappingFile, " -c ExtractionKit,Sample -t ", region, ".tree -e 200", sep = "")
+      coreDiversity2 <- paste("core_diversity_analyses.py -i ", biomTable, " -o ", region, "-core-output-1000 -m ",
+                             mappingFile, " -c ExtractionKit,Sample -t ", region, ".tree -e 1000", sep = "")
     }
+  #Split OTU tables by sample type and run summaries and beta diversity 
+  splitOtu <- paste ("split_otu_table.py -i ", region, "_otu_table.biom -m ", region, "-mapping-file.txt -f Sample -o per_sample_type_otu_tables", sep="")
+  splitSummary <- paste("summarize_taxa_through_plots.py -i per_sample_type_otu_tables/", region, "_otu_table__Sample_", samples, "__.biom -o per_sample_type_otu_tables/",
+                        region, "-", samples, "-summary-kit", " -m per_sample_type_otu_tables/", region, "-mapping-file__Sample_", samples, "__.txt -c ExtractionKit", sep = "")
+  splitbetaDiversity <- paste("beta_diversity.py -i per_sample_type_otu_tables/", region, "_otu_table__Sample_", samples, "__.biom -o per_sample_type_otu_tables/",
+                              region, "-beta-", samples, " -m bray_curtis\n",
+                              "principal_coordinates.py -i per_sample_type_otu_tables/", region, "-beta-", samples, "/bray_curtis_", region, "_otu_table__Sample_",
+                              samples, "__.txt -o per_sample_type_otu_tables/", region, "-beta-", samples, "/pcoa_bray_curtis_", region, "_", samples, ".txt\n", 
+                              "make_emperor.py -i per_sample_type_otu_tables/", region, "-beta-", samples, "/pcoa_bray_curtis_", region, "_", samples, 
+                              ".txt -o per_sample_type_otu_tables/", region, "-", samples, "-3D-bc -m per_sample_type_otu_tables/", region, "-mapping-file__Sample_",
+                              samples, "__.txt", sep = "")
+  splitCommands = c(splitSummary, splitbetaDiversity)
+  
+  #Add commands to the bash script
   system( paste ("echo \'echo running ", region, " beta diversity\' >> ", script, sep=""))
   system (paste("echo \'", betaDiversity, "\' >> ", script , sep = ""))
   system( paste ("echo \'echo running ", region, " core diversity, sampling depth 200\' >> ", script, sep=""))
   system (paste("echo \'", coreDiversity, "\' >> ", script , sep = ""))
   system( paste ("echo \'echo running ", region, " core diversity, sampling depth 1000\' >> ", script, sep=""))
   system (paste("echo \'", coreDiversity2, "\' >> ", script , sep = ""))
+  system( paste ("echo \'#SPLIT BY SAMPLE TYPE\' >> ", script, sep=""))
+  system (paste("echo \'", splitOtu, "\' >> ", script , sep = ""))
+  system( paste ("echo \'echo running ", region, " commands by sample type\' >> ", script, sep=""))
+  for (command in splitCommands) {
+    system (paste("echo \'", command, "\' >> ", script , sep = ""))
+  }
 }
 ```
 
@@ -146,3 +173,6 @@ system( paste ("cp ", sharedPathAn, "trees/*.tree ", sharedPathAn, "OTU_tables/d
 system (paste ("zip -r ~/downstream_processing.zip ", sharedPathAn, "OTU_tables/downstream_processing", sep=""))
 system ( paste("rm -r ", sharedPathAn, "OTU_tables/downstream_processing", sep=""))
 ```
+
+
+
