@@ -619,14 +619,30 @@ Removing chimeric sequences is suggested in most workflows. Snakemake v0.4 sugge
 Have to set a variable: $ export BLASTMAT=/opt/bio/ncbi/data/ so that blast works.
 Note: Reference files are provided in the training modules, this is a 16S reference database
 
-DEFINE REFERENCE DATABASE SETTINGS
+DEFINE REFERENCE DATABASE SETTINGS & store database names in lists
+
 ```{r}
-database_16S <- "SILVA" #greengenes or SILVA
 #SILVA DATABASE SETTINGS
 SILVA_tax_type <- "consensus" #consensus, majority or none
 SILVA_tax_levels <- "all" # 7 or all 
 SILVA_identity <- "97" # 90, 94, 97 or 99
 UNITE_identity <- "97" #97, 99 or dynamic
+
+refSeqs <- list ("16S" = paste ("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/databases/SILVA_132_QIIME_release/",
+                       "rep_set/rep_set_16S_only/", SILVA_identity ,"/silva_132_", SILVA_identity,  "_16S.fna", sep = ""),
+                  "18S" = paste ("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/databases/SILVA_132_QIIME_release/",
+                       "rep_set/rep_set_18S_only/", SILVA_identity ,"/silva_132_", SILVA_identity,  "_18S.fna", sep = ""),
+                  "ITS" = paste ("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/databases/UNITE",
+                       "/sh_refs_qiime_ver7_", UNITE_identity,  "_01.12.2017.fasta", sep =""),
+                  "COI" = "/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/rdp_training_sets/terrimporter/CO1_v3.2/mydata_training/mytrainseq_nh.fasta")
+refTax <- list ("16S" = paste ("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/databases/SILVA_132_QIIME_release/",
+                          "taxonomy/16S_only/", SILVA_identity, "/", SILVA_tax_type, "_taxonomy_", SILVA_tax_levels, "_levels.txt", sep = ""),
+                 "18S" = paste ("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/databases/SILVA_132_QIIME_release/",
+                          "taxonomy/18S_only/", SILVA_identity, "/", SILVA_tax_type, "_taxonomy_", SILVA_tax_levels, "_levels.txt", sep = ""),
+                 "ITS" = paste ("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/databases/UNITE",
+                       "/sh_taxonomy_qiime_ver7_", UNITE_identity,  "_01.12.2017.txt", sep =""),
+                 "COI" = "/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/rdp_training_sets/terrimporter/CO1_v3.2/mydata_training/mytrainseq_taxonomy.txt")
+
 ```
 
 ```{r}
@@ -636,45 +652,17 @@ tempFolder <- paste(sharedPathAn, prefix_I, "/", "mytemp", sep= "")
 cmds <- c()
 
 for (region in unique(metadataAdapRM$Region)){
-  rm(refFasta)
-  rm(refTaxonomy)
-  if (region == "16S" & database_16S == "greengenes"){
-    refFasta <- "/space/project/grdi/eco/training/20170223/pipeline/snakemake-workflows-0.2/greengenes_97_otus.fasta"
-    refTaxonomy <- "/space/project/grdi/eco/training/20170223/pipeline/snakemake-workflows-0.2/greengenes_97_otu_taxonomy.txt"
-  } 
-  if (region == "16S" & database_16S == "SILVA"){
-    refFasta <- paste ("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/databases/SILVA_132_QIIME_release/",
-                       "rep_set/rep_set_16S_only/", SILVA_identity ,"/silva_132_", SILVA_identity,  "_16S.fna", sep = "")
-    refTaxonomy <- paste ("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/databases/SILVA_132_QIIME_release/",
-                          "taxonomy/16S_only/", SILVA_identity, "/", SILVA_rep_type, "_taxonomy_", SILVA_tax_levels, "_levels.txt", sep = "")
-  } 
-  if (region == "18S"){
-    refFasta <- paste ("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/databases/SILVA_132_QIIME_release/",
-                       "rep_set/rep_set_18S_only/", SILVA_identity ,"/silva_132_", SILVA_identity,  "_18S.fna", sep = "")
-    refTaxonomy <- paste ("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/databases/SILVA_132_QIIME_release/",
-                          "taxonomy/18S_only/", SILVA_identity, "/", SILVA_rep_type, "_taxonomy_", SILVA_tax_levels, "_levels.txt", sep = "")
-  }
-  if (region == "ITS"){
-    refFasta <- paste ("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/databases/UNITE",
-                       "/sh_refs_qiime_ver7_", UNITE_identity,  "_01.12.2017.fasta", sep ="")
-    refTaxonomy <- paste ("/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/databases/UNITE",
-                       "/sh_taxonomy_qiime_ver7_", UNITE_identity,  "_01.12.2017.txt", sep ="")
-  }
-  if (region == "COI"){
-    refFasta <- "/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/rdp_training_sets/terrimporter/CO1_v3.2/mydata_training/mytrainseq_nh.fasta"
-    refTaxonomy <- "/space/project/grdi/eco/groups/bilodeaug/gir001/PIRL_working/References/rdp_training_sets/terrimporter/CO1_v3.2/mydata_training/mytrainseq_taxonomy.txt"
-  }
   repSeq <- paste (sharedPathAn, prefix_H, "/", region, "_representative_seqs_set.fasta" , sep = "")
   chimericList <- paste(sharedPathAn, prefix_I, "/", region, "_chimera_list.txt" , sep="")
   cmd <- paste ("mkdir ", tempFolder, "\n",
                 "export TMPDIR=", tempFolder, "\n",
                 "export BLASTMAT=/opt/bio/ncbi/data/\n",
-                "time parallel_identify_chimeric_seqs.py -i ", repSeq, " -t ", refTaxonomy, " -r ", 
-                refFasta, " -m blast_fragments -o ", chimericList, " -O ", threads, 
+                "time parallel_identify_chimeric_seqs.py -i ", repSeq, " -t ", refTax[[region]], " -r ", 
+                refSeqs[[region]], " -m blast_fragments -o ", chimericList, " -O ", threads, 
                 "\nrm -r ", tempFolder, sep = "" )
   cmds <- c(cmds, cmd)
   system(paste("echo 'parallel_identify_chimeric_seqs.py method: BLAST\n\treference sequences: ", 
-               refFasta, "\n\treference taxonomy: ", refTaxonomy, "' >> ", notesAn, region, "-analysis-notes.txt" , sep=""))
+               refSeqs[[region]], "\n\treference taxonomy: ", refTax[[region]], "' >> ", notesAn, region, "-analysis-notes.txt" , sep=""))
 }
 MakeJobs(cmds, prefix_I, threads, 8000, 172800, "yes")
 ```
@@ -719,7 +707,7 @@ Changed from parallel_assign_taxonomy_rdp.py to assign_taxonomy.py -m rdp,
 because it wasn't running easily in parallel. 
 
 ```{r}
-prefix_K <- "K_classify" ## running tests with a different command 
+prefix_K <- "K_classify" 
 classifyConfidence <- "0.70"
 tempFolder <- paste(sharedPathAn, prefix_K, "/", "mytemp", sep= "")
 cmds <- c()
@@ -734,31 +722,27 @@ for (region in unique(metadataAdapRM$Region)){
     inputFasta <- repSeq
     print( paste(region, " representative sequences without chimeras not found, using: ", inputFasta, sep=""))
   }
-  refFasta <- system(paste("grep 'reference sequences' ", notesAn, region, "-analysis-notes.txt",
-                           " | cut -d ' ' -f 3", sep=""), intern = TRUE)
-  refTaxonomy <- system(paste("grep 'reference taxonomy' ", notesAn, region, "-analysis-notes.txt",
-                           " | cut -d ' ' -f 3", sep=""), intern = TRUE)
   if (region == "COI") {
     cmd <- paste ("mkdir ", tempFolder, "\n",
               "export TMPDIR=", tempFolder, "\n",
               "export BLASTMAT=/opt/bio/ncbi/data/\n",
-              "time parallel_assign_taxonomy_blast.py -i ", inputFasta, " -r ", refFasta, " -t ", refTaxonomy,
+              "time parallel_assign_taxonomy_blast.py -i ", inputFasta, " -r ", refSeqs[[region]], " -t ", refTax[[region]],
               " -o ", sharedPathAn, prefix_K, " -O ", threads,
               "\nrm -r ", tempFolder, sep = "" )
     system(paste("echo 'parallel_assign_taxonomy_blast.py\n\tmethod: BLAST\n\tinput fasta: ", inputFasta, 
-                 refFasta, "\n\treference taxonomy: ", refTaxonomy, "' >> ", notesAn, region, "-analysis-notes.txt" , sep=""))
+                 refSeqs[[region]], "\n\treference taxonomy: ", refTax[[region]], "' >> ", notesAn, region, "-analysis-notes.txt" , sep=""))
     cmds <- c(cmds, cmd)
     next()
   }
   cmd <- paste ("mkdir ", tempFolder, "\n",
                 "export TMPDIR=", tempFolder, "\n",
-                "time assign_taxonomy.py -m rdp -i ", inputFasta, " -r ", refFasta, " -t ", refTaxonomy, 
+                "time assign_taxonomy.py -m rdp -i ", inputFasta, " -r ", refSeqs[[region]], " -t ", refTax[[region]], 
                  " -c ", classifyConfidence, " -o ", sharedPathAn, prefix_K, " --rdp_max_memory 10000",  
                 #sep = "" )
                 "\nrm -r ", tempFolder, sep = "" )
   cmds <- c(cmds, cmd)
   system(paste("echo 'assign_taxonomy.py\n\tmethod: RDP classifier\n\tinput fasta: ", inputFasta, "\n\treference sequences: ", 
-               refFasta, "\n\treference taxonomy: ", refTaxonomy, "\n\tconfidence: ", classifyConfidence, "' >> ", notesAn, region, "-analysis-notes.txt" , sep=""))
+               refSeqs[[region]], "\n\treference taxonomy: ", refTax[[region]], "\n\tconfidence: ", classifyConfidence, "' >> ", notesAn, region, "-analysis-notes.txt" , sep=""))
 
 }
 MakeJobs(cmds, prefix_K, threads, 10000, 172800, "yes") #All will run with 4, although only necessary for COI
@@ -785,7 +769,7 @@ cmds <- c()
 for (region in unique(metadataAdapRM$Region)){
   pickOtutxt <- paste(sharedPathAn, prefix_G,  "/", region, "_adapRemMerged_trimmomatic_unsorted_otus.txt", sep="")
   inputFasta <- system(paste("grep 'input fasta' ", notesAn, region, "-analysis-notes.txt",
-                           " | cut -d ' ' -f 3", sep=""), intern = TRUE)
+                           " | cut -d ' ' -f 3 | tail -n 1", sep=""), intern = TRUE)
   taxAssignments <- paste (sharedPathAn, prefix_K, "/", gsub(".fasta", "_tax_assignments.txt", basename(inputFasta)), sep="" )
   biomTable <- paste (notesAn, region, "_otu_table.biom", sep="")
   cmd <- paste ("make_otu_table.py -i ", pickOtutxt, " -t ", taxAssignments, " -o ", biomTable, sep="")
