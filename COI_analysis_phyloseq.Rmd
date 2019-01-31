@@ -1,0 +1,203 @@
+---
+title: "Metagenomics_wphyloseq"
+author: "Beatriz"
+date: "January 10, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Install phyloseq
+```{r}
+source('http://bioconductor.org/biocLite.R')
+biocLite('phyloseq')
+packageVersion('phyloseq')
+```
+
+Load phyloseq and ggplot
+```{r}
+library("phyloseq") #; packageVersion("phyloseq")
+library("ggplot2") #; packageVersion("ggplot2")
+#theme_set(theme_bw())
+```
+
+WORKING WITH COI INVERTEBRATE SAMPLES
+1. Load data
+```{r}
+region <- "COI"
+sharedPathAn <- "/fs/hnas1-evs1/Dgrdi/grdi_eco/groups/bilodeaug/gir001/PIRL_working/ecoBiomics_Ian/"
+biomTable <-import_biom( paste ( sharedPathAn, "OTU_tables/per_sample_type_otu_tables/", region, "_otu_table__Sample_invertebrate__.biom", sep=""))
+mappingFile <- import_qiime_sample_data(paste(sharedPathAn, "OTU_tables/per_sample_type_otu_tables/", region, "-mapping-file__Sample_invertebrate__.txt", sep=""))
+library(ape)
+COImergedData <-  merge_phyloseq(biomTable, mappingFile) #if no tree
+colnames(sample_data(COImergedData))[5] = "SampleType"
+colnames(tax_table(COImergedData))[8] = "Genus" 
+colnames(tax_table(COImergedData))[9] = "Species" 
+mergedDatar  = transform_sample_counts(COImergedData, function(x) x / sum(x) )
+mergedDatafr = filter_taxa(mergedDatar, function(x) mean(x) > 1e-3, TRUE)
+####needs non zero mergedDatafrC = filter_taxa(mergedDatafr, function(x) sum(x > 3) > (0.2*length(x)), TRUE)
+####needs non zero mergedDatafrf = filter_taxa(mergedDatafr, function(x) sd(x)/mean(x) > 3.0, TRUE)
+mergedDatafrf = prune_taxa(taxa_sums(mergedDatafr) > 0, mergedDatafr)
+```
+
+See the data:
+```{r}
+sample_names(mergedData)
+ntaxa(mergedData)
+rank_names(mergedData)
+colnames(sample_data(mergedData))[5] = "SampleName"
+sample_variables(mergedData)
+```
+
+2. Plot Faceted Genera Color by Species
+```{r}
+#plot_bar(mergedDatafr, "Rank7", fill="Genus", facet_grid="ExtractionKit")
+plot_bar(mergedDatafr,  fill="Species") + facet_wrap(~Genus) +
+  scale_x_discrete(labels=c("Aaegypti-NS", "Aaegypti-PS","Aaegypti-PW", "Ctarsalis-NS", "Ctarsalis-PS", "Ctarsalis-PW" ))
+ggsave(paste (sharedPathAn, "/OTU_tables/COI-inv-facet-genera-sp.pdf", sep = ""))
+```
+
+3. Invertebrate samples highlighting the Genera found in the samples
+```{r}
+plot_bar(mergedDatafr, fill="Genus") +
+  theme(legend.key.size = unit(0.4,"cm"), axis.text.x = element_text(angle = 0, size=8, hjust = 0.5), 
+        plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50")) + 
+  scale_fill_brewer(palette = "Paired")  +
+  scale_x_discrete(labels=c("Aaegypti-NS", "Aaegypti-PS","Aaegypti-PW", "Ctarsalis-NS", "Ctarsalis-PS", "Ctarsalis-PW" )) +
+  ggtitle("COI Invertebrate Samples")
+ggsave(paste (sharedPathAn, "/OTU_tables/COI-inv-genera.pdf", sep = ""))
+```
+
+4. Diptera Species in Invertebrate COI samples
+
+```{r}
+coiDip = subset_taxa(mergedDatafr, Rank6 == "Diptera") 
+plot_bar(coiDip,  fill="Species") + 
+  theme(legend.key.size = unit(0.3,"cm"), axis.text.x = element_text(angle = 0, size=8, hjust = 0.5), plot.title = element_text(hjust = 0.5)) +
+  scale_x_discrete(labels=c("Aaegypti-NS", "Aaegypti-PS","Aaegypti-PW", "Ctarsalis-NS", "Ctarsalis-PS", "Ctarsalis-PW" )) +
+ggtitle("COI Diptera Species per Sample")
+ggsave(paste (sharedPathAn, "/OTU_tables/COI-inv-diptera-species.pdf", sep = ""))
+#top20 <- names(sort(taxa_sums(mergedDatafrf), decreasing=TRUE))[1:20]
+#coiDiptop20 = subset_taxa(mergedDatafrf, Rank6 == "Diptera")
+#myplot <- plot_bar(coiDiptop20,  x = "SampleType", fill="Rank8")
+```
+
+WORKING WITH COI BENTHIC SAMPLES
+1. Load data
+```{r}
+region <- "COI"
+sharedPathAn <- "/fs/hnas1-evs1/Dgrdi/grdi_eco/groups/bilodeaug/gir001/PIRL_working/ecoBiomics_Ian/"
+biomTable <-import_biom( paste ( sharedPathAn, "OTU_tables/per_sample_type_otu_tables/", region, "_otu_table__Sample_benthic__.biom", sep=""))
+mappingFile <- import_qiime_sample_data(paste(sharedPathAn, "OTU_tables/per_sample_type_otu_tables/", region, "-mapping-file__Sample_benthic__.txt", sep=""))
+mergedData <-  merge_phyloseq(biomTable, mappingFile) #if no tree
+colnames(sample_data(mergedData))[5] = "SampleType"
+colnames(tax_table(mergedData))[8] = "Genus" 
+colnames(tax_table(mergedData))[9] = "Species" 
+mergedDatar  = transform_sample_counts(mergedData, function(x) x / sum(x) )
+mergedDatafr = filter_taxa(mergedDatar, function(x) mean(x) > 5e-3, TRUE)
+```
+
+2. Plot shows differences in the species found in Benthic samples extracted using different kits. 
+```{r}
+plot_bar(mergedDatafr,  "Genus", fill="Species", facet_grid="ExtractionKit")
+#plot_bar(mergedDatafr,  "Rank7", fill="Species") + facet_wrap(~Genus)
+ggsave(paste (sharedPathAn, "/OTU_tables/COI-ben-kit-species.pdf", sep = ""))
+
+```
+3. 
+```{r}
+#mergedDatafr = filter_taxa(mergedDatar, function(x) mean(x) > 1e-3, TRUE)
+coiArthr = subset_taxa(mergedDatafr, Rank4 == "Arthropoda") 
+plot_bar(coiArthr, "Genus", fill="Species", facet_grid = "ExtractionKit") + 
+  theme(legend.key.size = unit(0.3,"cm"), plot.title = element_text(hjust = 0.5)) +
+  #scale_x_discrete(labels=c("Aaegypti-NS", "Aaegypti-PS","Aaegypti-PW", "Ctarsalis-NS", "Ctarsalis-PS", "Ctarsalis-PW" )) +
+ggtitle("COI Arthropoda Species in Benthic Samples")
+ggsave(paste (sharedPathAn, "/OTU_tables/COI-ben-kit-arthr-sp.pdf", sep = ""))
+
+```
+
+
+WORKING WITH ALL COI SAMPLES 
+
+```{r}
+region <- "COI"
+sharedPathAn <- "/fs/hnas1-evs1/Dgrdi/grdi_eco/groups/bilodeaug/gir001/PIRL_working/ecoBiomics_Ian/"
+biomTable <-import_biom( paste ( sharedPathAn, "OTU_tables/", region, "_otu_table.biom", sep=""))
+mappingFile <- import_qiime_sample_data(paste(sharedPathAn, "OTU_tables/", region, "-mapping-file.txt", sep=""))
+COIallMergedData <-  merge_phyloseq(biomTable, mappingFile) #if no tree
+colnames(sample_data(COIallMergedData))[5] = "SampleType"
+colnames(tax_table(COIallMergedData))[8] = "Genus" 
+colnames(tax_table(COIallMergedData))[9] = "Species" 
+mergedDatar  = transform_sample_counts(COIallMergedData, function(x) x / sum(x) )
+mergedDatafr = filter_taxa(COIallMergedData, function(x) mean(x) > 2.5e-3, TRUE)
+mergedDatafrf = prune_taxa(taxa_sums(mergedDatafr) > 0, mergedDatafr)
+```
+
+```{r}
+coiPWPS = subset_samples(mergedDatafr, ExtractionKit == "PowerWater" |ExtractionKit == "PowerSoil" ) 
+coiPWPSArthr = subset_taxa(coiPWPS, Rank4 == "Arthropoda")
+
+plot_bar(coiPWPS, "Genus", fill="Species", facet_grid = "ExtractionKit~SampleType") + 
+  #theme(legend.key.size = unit(0.3,"cm"), axis.text.x = element_text(angle = 0, size=8, hjust = 0.5), plot.title = element_text(hjust = 0.5)) +
+  theme(legend.position = "none") 
+ggsave(paste (sharedPathAn, "/OTU_tables/COI-all-PWvsPS.pdf", sep = ""))
+```
+
+
+
+
+
+WORKING WITH COI SOIL SAMPLES
+1. Load data
+```{r}
+region <- "COI"
+sharedPathAn <- "/fs/hnas1-evs1/Dgrdi/grdi_eco/groups/bilodeaug/gir001/PIRL_working/ecoBiomics_Ian/"
+biomTable <-import_biom( paste ( sharedPathAn, "OTU_tables/per_sample_type_otu_tables/", region, "_otu_table__Sample_soil__.biom", sep=""))
+mappingFile <- import_qiime_sample_data(paste(sharedPathAn, "OTU_tables/per_sample_type_otu_tables/", region, "-mapping-file__Sample_soil__.txt", sep=""))
+mergedData <-  merge_phyloseq(biomTable, mappingFile) #if no tree
+colnames(sample_data(mergedData))[5] = "SampleType"
+colnames(tax_table(mergedData))[8] = "Genus" 
+colnames(tax_table(mergedData))[9] = "Species" 
+mergedDatar  = transform_sample_counts(mergedData, function(x) x / sum(x) )
+mergedDatafr = filter_taxa(mergedDatar, function(x) mean(x) > 2.5e-3, TRUE)
+```
+
+2. Plot shows differences in the species found in Benthic samples extracted using different kits. 
+```{r}
+plot_bar(mergedDatafr,  "Rank6", fill="Genus", facet_grid="ExtractionKit") +
+  theme(legend.position = "bottom") 
+ggsave(paste (sharedPathAn, "/OTU_tables/COI-soil-kit-genera.pdf", sep = ""))
+
+
+coiPWPS = subset_samples(mergedDatar, ExtractionKit == "QuickPick") 
+mergedDatafr = filter_taxa(coiPWPS, function(x) mean(x) > 2.5e-3, TRUE)
+plot_bar(mergedDatafr,  "Rank4", fill="Genus") +
+  theme(legend.position = "none")
+
+```
+
+Alpha diversity COI
+
+```{r}
+region <- "COI"
+sharedPathAn <- "/fs/hnas1-evs1/Dgrdi/grdi_eco/groups/bilodeaug/gir001/PIRL_working/ecoBiomics_Ian/"
+biomTable <-import_biom( paste ( sharedPathAn, "OTU_tables/", region, "_otu_table.biom", sep=""))
+mappingFile <- import_qiime_sample_data(paste(sharedPathAn, "OTU_tables/", region, "-mapping-file.txt", sep=""))
+COIallMergedData <-  merge_phyloseq(biomTable, mappingFile) #if no tree
+colnames(sample_data(COIallMergedData))[5] = "SampleType"
+colnames(tax_table(COIallMergedData))[8] = "Genus" 
+colnames(tax_table(COIallMergedData))[9] = "Species" 
+mergedDatar  = transform_sample_counts(COIallMergedData, function(x) x / sum(x) )
+mergedDatafr = filter_taxa(COIallMergedData, function(x) mean(x) > 2.5e-3, TRUE)
+mergedDatafrf = prune_taxa(taxa_sums(mergedDatafr) > 0, mergedDatafr)
+COIallMergedData <- prune_taxa(taxa_sums(COIallMergedData) > 0, COIallMergedData)
+plot_richness(COImergedData, x="ExtractionKit", measures=c("Chao1", "Shannon"))
+plot_richness(COIallMergedData, x="ExtractionKit", color="SampleType", measures=c("Chao1", "Shannon"))
+```
+
+
+
+
+
+
