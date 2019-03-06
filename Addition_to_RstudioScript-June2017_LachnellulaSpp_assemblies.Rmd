@@ -1,0 +1,142 @@
+---
+title: "supplement_to_RstudioScript-June2017_LachnellulaSpp_assemblies"
+author: "Emily Giroux"
+date: "9/13/2017"
+output: html_document
+---
+
+Add paths to metadata assembly of genes predicted by Augustus using Blast2GO PRO, the aa fasta and
+gff3 files:
+```{r}
+metadataAssembly$b2gAAfilename <- paste(metadataAssembly$SppAbbr, "_aa_blast2go", sep = "")
+metadataAssembly$b2gAApath <- paste(sharedPathAn, metadataAssembly$ScientificName, "/", 
+                                    metadataAssembly$SppAbbr, "_NCBI_files/", 
+                                    metadataAssembly$b2gAAfilename, ".fasta", sep = "")
+```
+
+
+
+Generate the bash scripts that will perform blasts of the query against each of the query databases made.
+```{r}
+newDir <- paste(paste(sharedPathAn, "Augustus/", metadataAssembly$LibraryName, sep = ""))
+for(i in 1:length(newDir)){dir.create(newDir[i], showWarnings = TRUE, recursive = FALSE)}
+
+for(i in 1:nrow(metadataAssembly)){
+    cmd <- with(metadataAssembly, 
+                #cat(paste(
+                paste(
+                paste(" awk 'BEGIN {n_seq=0;} /^>/ {if(n_seq%1000==0){file=sprintf(\"", sep = ""),
+                # paste(sharedPathAn,"Augustus/",metadataAssembly$LibraryName,"/", sep = ""),
+                paste(sharedPathAn, metadataAssembly$ScientificName, "/", metadataAssembly$SppAbbr, "_NCBI_files/", sep = ""),
+                paste(metadataAssembly$LibraryName, "_%d.aa\"", ",n_seq);} print >> file; ", sep = ""),
+                paste(" n_seq++; next;} { print >> file; }' < ", sep = ""),
+                # paste(metadataAssembly$Augustus1aaPath, sep = ""),
+                paste(metadataAssembly$b2gAApath, sep = ""),
+                sep = ""))
+}
+
+cat(cmd[1])
+ awk 'BEGIN {n_seq=0;} /^>/ {if(n_seq%1000==0){file=sprintf("/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_arida/Lari_NCBI_files/Lari_IonT_2017_1_%d.aa",n_seq);} print >> file;  n_seq++; next;} { print >> file; }' < /home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_arida/Lari_NCBI_files/Lari_aa_blast2go.fasta
+
+cat(cmd[2])
+ awk 'BEGIN {n_seq=0;} /^>/ {if(n_seq%1000==0){file=sprintf("/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_cervina/Lcer_NCBI_files/Lcer_IonT_2017_1_%d.aa",n_seq);} print >> file;  n_seq++; next;} { print >> file; }' < /home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_cervina/Lcer_NCBI_files/Lcer_aa_blast2go.fasta
+
+cat(cmd[3])
+ awk 'BEGIN {n_seq=0;} /^>/ {if(n_seq%1000==0){file=sprintf("/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_hyalina/Lhya_NCBI_files/Lhya_IonT_2017_1_%d.aa",n_seq);} print >> file;  n_seq++; next;} { print >> file; }' < /home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_hyalina/Lhya_NCBI_files/Lhya_aa_blast2go.fasta
+
+cat(cmd[4])
+ awk 'BEGIN {n_seq=0;} /^>/ {if(n_seq%1000==0){file=sprintf("/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_occidentalis/Locc_NCBI_files/Locc_IonT_2017_1_%d.aa",n_seq);} print >> file;  n_seq++; next;} { print >> file; }' < /home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_occidentalis/Locc_NCBI_files/Locc_aa_blast2go.fasta
+
+cat(cmd[5])
+ awk 'BEGIN {n_seq=0;} /^>/ {if(n_seq%1000==0){file=sprintf("/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_subtilissima/Lsub_NCBI_files/Lsub_IonT_2017_1_%d.aa",n_seq);} print >> file;  n_seq++; next;} { print >> file; }' < /home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_subtilissima/Lsub_NCBI_files/Lsub_aa_blast2go.fasta
+
+cat(cmd[6])
+ awk 'BEGIN {n_seq=0;} /^>/ {if(n_seq%1000==0){file=sprintf("/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_NCBI_files/Lsue_IonT_2017_1_%d.aa",n_seq);} print >> file;  n_seq++; next;} { print >> file; }' < /home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_NCBI_files/Lsue_aa_blast2go.fasta
+
+cat(cmd[7])
+ awk 'BEGIN {n_seq=0;} /^>/ {if(n_seq%1000==0){file=sprintf("/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_willkommii/Lawi_NCBI_files/Lawi_IonT_Debbie_1_%d.aa",n_seq);} print >> file;  n_seq++; next;} { print >> file; }' < /home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_willkommii/Lawi_NCBI_files/Lawi_aa_blast2go.fasta
+```
+
+Blastp:
+```{r}
+
+prefix <- "b2g_AA_Blastp_splitFasta2"
+
+aaB2G_BlastFiles2 <- list.files(path = paste(sharedPathAn, metadataAssembly$ScientificName[1], "/", 
+                                            metadataAssembly$SppAbbr[1], "_NCBI_files",sep = ""), 
+                              pattern = "*\\.aa$", recursive = FALSE, full.names = TRUE)
+
+node <- 11
+i <- 1
+for(i in 1:length(aaB2G_BlastFiles2)){
+    cmd <- paste(pathBlastp,
+                 " -db ", pathBlastDbNr,
+                 " -query ", aaB2G_BlastFiles2,
+                 " -outfmt '", outFmt,
+                 " ' -out ", paste(aaB2G_BlastFiles2, ".blastp.xml", sep = ""),
+                 " -num_threads ", node,
+                 " -evalue ", eval,
+                 " -show_gis ",
+                 " -num_alignments ", numAligns,
+                 #" -max_hsps_per_subject ", maxHsps,
+                 sep = "")
+}
+cmd[1]
+
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
+```
+
+*** Interproscan requires glibc > 2.14, but we have v 2.12 on the system.
+Updating it or changing it is hell, and strongly advised against.
+So the next chunk can't run successfully. 
+we will need to run this on a standalone, or find a solution.
+
+* Not done yet - running interproscan
+Running it on the assembly, not the processed fastq.
+There is a problem with the output directory - it`s not going to what I specified, instead it`s
+putting the output in qsub directory in the temp folder, with the biocluster qsub name as prefix.
+```{r}
+interproPath <- "/home/CFIA-ACIA/girouxeml/prog/my_interproscan/interproscan-5.24-63.0/interproscan.sh"
+
+prefix <- "interProScanQsubB2G"
+interproAppsNoGene3d <- "CDD-3.14,Coils-2.2.1,Hamap-201701.18,MobiDBLite-1.0,PANTHER-11.1,Pfam-31.0,PIRSF-3.02,PRINTS-42.0,ProDom-2006.1,ProSitePatterns-20.132,ProSiteProfiles-20.132,SMART-7.1,SUPERFAMILY-1.75,TIGRFAM-15.0"
+
+
+i <- 1
+node <- "24"
+for(i in 1:nrow(metadataAssembly)){
+    cmd <- with(metadataAssembly,
+                paste(interproPath, " ",
+                      # " -i ", metadataAssembly$Augustus1aaPath,
+                      " -i ", metadataAssembly$b2gAApath,
+                      " -appl ", interproAppsNoGene3d, 
+                      " --cpu 24 ",
+                      sep = ""))
+}
+cmd[3]
+suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
+```
+
+
+# Create a directory for interpro outputs:
+```{r}
+interProSOutpath <- paste(sharedPathAn, prefix, "/", sep = "")
+
+dir.create(paste(interProSOutpath, "/", 
+                 paste(metadataAssembly$SppAbbr, "_interproscan_results_xml/", sep = ""),
+                 sep = ""), 
+           showWarnings = TRUE, 
+           recursive    = FALSE)
+
+for(k in 1:nrow(metadataAssembly)){
+    metadataAssembly$InterPSoutDirPath <- paste(interProSOutpath,
+                                                metadataAssembly$SppAbbr, "_interproscan_results_xml/",
+                                                sep = "")
+}
+# Move the interproscan results to the new directories
+for(j in 1:length(metadataAssembly$LibraryName)){
+    cmd <- paste("mv ", paste(interProSOutpath, metadataAssembly$LibraryName, "_*", sep = ""), " ", metadataAssembly$InterPSoutDirPath, sep = "")
+}
+
+system(cmd)
+```

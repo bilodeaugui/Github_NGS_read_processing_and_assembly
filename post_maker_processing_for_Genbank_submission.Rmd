@@ -107,7 +107,7 @@ uniProtSwissPDB <- paste(programsPath, "databases/uniprot_sprot.fasta", sep = ""
 **Note,** require entire proteome from a  min of two related species and perhaps all of UniProt/SwissProt. 
 See advice for multiple proteomes for homology: https://groups.google.com/forum/#!topic/maker-devel/jbBm_4ycFU8
   
-**_Marsonnina brunnea_** available at: https://www.ncbi.nlm.nih.gov/genome/?term=txid698440[orgn]:
+**_Marssonina brunnea_** available at: https://www.ncbi.nlm.nih.gov/genome/?term=txid698440[orgn]:
 ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/298/775/GCA_000298775.1_ASM29877v1  
   
 For **_Sclerotinia sclerotiorum_**: https://www.ncbi.nlm.nih.gov/genome/?term=txid5180[orgn]   
@@ -616,15 +616,6 @@ for(k in 1:nrow(metadataAssemblies)){
 
 Run the final tbl2asn:
 ```{r}
-for(k in 2:nrow(metadataAssemblies)){
-    file.rename(from = paste(metadataAssemblies$postMakerGAG_final[k], "genome.tbl", sep = ""),
-                to = paste(metadataAssemblies$postMakerGAG_final[k], metadataAssemblies$SppAbbrv[k], ".tbl", sep = ""))
-}
-for(k in 2:nrow(metadataAssemblies)){
-    file.rename(from = paste(metadataAssemblies$postMakerGAG_final[k], "genome.fasta", sep = ""),
-                to = paste(metadataAssemblies$postMakerGAG_final[k], metadataAssemblies$SppAbbrv[k], ".fsa", sep = ""))
-}
-
 # Copy the NCBI template file to the tbl2asn directory:
 for(k in 2:nrow(metadataAssemblies)){
     file.copy(from = paste(sharedPathAn, metadataAssemblies$SppAbbrv[k], "_template.sbt", sep = ""),
@@ -634,14 +625,14 @@ for(k in 2:nrow(metadataAssemblies)){
 
 # Copy the tbl file to the tbl2asn directory:
 for(k in 2:nrow(metadataAssemblies)){
-    file.copy(from = paste(metadataAssemblies$postMakerGAG_final[k],  metadataAssemblies$SppAbbrv[k], ".tbl", sep = ""),
+    file.copy(from = paste(metadataAssemblies$postMakerGAG_final[k], "genome.tbl", sep = ""),
               to = paste(metadataAssemblies$postMakerGAG_final[k], "tbl2asn/", metadataAssemblies$SppAbbrv[k], ".tbl", sep = ""),
               overwrite = FALSE, recursive = FALSE, copy.mode = TRUE, copy.date = FALSE)
 }
 
 # Copy the assembly fasta file to the tbl2asn directory:
 for(k in 2:nrow(metadataAssemblies)){
-    file.copy(from = paste(metadataAssemblies$postMakerGAG_final[k],  metadataAssemblies$SppAbbrv[k], ".fsa", sep = ""),
+    file.copy(from = paste(metadataAssemblies$postMakerGAG_final[k], "genome.fasta", sep = ""),
               to = paste(metadataAssemblies$postMakerGAG_final[k], "tbl2asn/", metadataAssemblies$SppAbbrv[k], ".fsa", sep = ""),
               overwrite = FALSE, recursive = FALSE, copy.mode = TRUE, copy.date = FALSE)
 }
@@ -650,13 +641,15 @@ for(k in 2:nrow(metadataAssemblies)){
 metadataAssemblies$organism <- metadataAssemblies$ScientificName
 metadataAssemblies$organism <- gsub("_", " ", metadataAssemblies$organism)
 prefix <- "post_maker_final_tbl2asn"
+
+# This is the command that works for NCBI, confirmed by NCBI. Don't add other options!
 cmd <- with(metadataAssemblies,
             paste("cd ", paste(postMakerGAG_final, "tbl2asn/", sep = ""), " && ",
                   tbl2asnPath, ' -j "[organism=', organism, '][strain=', strain_CBS,']"',   
                   " -t ", paste(SppAbbrv, "_template.sbt", sep = ""), 
-                  " -p. -M n -Z discrep -a r1k -c bf -V bvg -X E -S T ", sep = ""))
+                  " -p. -M n -Z discrep -a r1k -V b -X E ", sep = ""))
 
-cmd[2]
+cmd[7]
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd[2:7], prefix, suffix, node) 
 ```
 
@@ -702,18 +695,96 @@ suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 
 Submit the final .sqn files to NCBI. Fix errors that they find.
 
+The "Note" feature in the 9th column is lost when using GAG. Below I'm trying to see if I can re-integrate it for the 
+Lsue assembly:
+```{r}
+library(data.table)
+gffPath <- paste(metadataAssemblies$postMaker[7], "Annie.Gag.genome.gff", sep = "")
+gff     <- read.table(file = gffPath, header = F, sep = "\t",  quote = "", comment.char="#", fill = T)
+gffNotes <- subset(gff, select = c(V3, V9))
 
-### Notes:  
-for SEQ_FEAT.MissingTrnaAA I removed all trna annotations with the word pseudo in them.  
-For tRNA annotations that have AA infor, add the following:  
+# This gets our ID= feild:
+gffNotes$ID <- as.character(lapply(strsplit(as.character(gffNotes$V9), split = ";"), "[",1))
 
-To Gene: ;gbkey=Gene;gene_biotype=tRNA  
-i.e.,   
-contig00684	maker	gene	10341	10512	.	-	.	ID=trnascan-contig00684-noncoding-Leu_CAA-gene-0.20;gbkey=Gene;gene_biotype=tRNA  
+# This gets our Name= feild:
+gffNotes$Name <- as.character(lapply(strsplit(as.character(gffNotes$V9), split = ";Name="), "[",2))
+gffNotes$Name <- as.character(lapply(strsplit(as.character(gffNotes$Name), split = ";"), "[",1))
 
-To tRNA and exon:  ;Note=Leucine tRNA (tRNA-Leu)%2C predicted by tRNAscan-SE analysis;gbkey=tRNA;product=tRNA-Leu  
-i.e,  
-contig00684	maker	tRNA	10341	10512	.	-	.	ID=trnascan-contig00684-noncoding-Leu_CAA-gene-0.20-tRNA-1;Parent=trnascan-contig00684-noncoding-Leu_CAA-gene-0.20;Note=Leucine tRNA (tRNA-Leu)%2C predicted by tRNAscan-SE analysis;gbkey=tRNA;product=tRNA-Leu  
-contig00684	maker	exon	10341	10371	.	-	.	ID=trnascan-contig00684-noncoding-Leu_CAA-gene-0.20-tRNA-1:exon:3962;Parent=trnascan-contig00684-noncoding-Leu_CAA-gene-0.20-tRNA-1;Note=Leucine tRNA (tRNA-Leu)%2C predicted by tRNAscan-SE analysis;gbkey=tRNA;product=tRNA-Leu  
-contig00684	maker	exon	10476	10512	.	-	.	ID=trnascan-contig00684-noncoding-Leu_CAA-gene-0.20-tRNA-1:exon:3963;Parent=trnascan-contig00684-noncoding-Leu_CAA-gene-0.20-tRNA-1;Note=Leucine tRNA (tRNA-Leu)%2C predicted by tRNAscan-SE analysis;gbkey=tRNA;product=tRNA-Leu 
+# This gets our Alias= feild:
+gffNotes$Alias <- as.character(lapply(strsplit(as.character(gffNotes$V9), split = ";Alias="), "[",2))
+gffNotes$Alias <- as.character(lapply(strsplit(as.character(gffNotes$Alias), split = ";"), "[",1))
+
+# This gets our Dbxref= feild:
+gffNotes$Dbxref <- as.character(lapply(strsplit(as.character(gffNotes$V9), split = ";Dbxref="), "[",2))
+gffNotes$Dbxref <- as.character(lapply(strsplit(as.character(gffNotes$Dbxref), split = ";"), "[",1))
+
+# This gets our Ontology_term= feild and whatever comes after it:
+gffNotes$Ontology <- as.character(lapply(strsplit(as.character(gffNotes$V9), split = ";Ontology_term="), "[",2))
+gffNotes$Ontology <- as.character(lapply(strsplit(as.character(gffNotes$Ontology), split = ";"), "[",1))
+
+# This gets our product= feild and whatever comes after it:
+gffNotes$Product <- as.character(lapply(strsplit(as.character(gffNotes$V9), split = ";product="), "[",2))
+gffNotes$Product <- as.character(lapply(strsplit(as.character(gffNotes$Product), split = ";"), "[",1))
+gffNotes$ProductName <- "Product"
+# This gets our Note feild:
+gffNotes$featNotes <- as.character(lapply(strsplit(as.character(gffNotes$V9), split = ";Note="), "[",2))
+gffNotes$featNotes <- as.character(lapply(strsplit(as.character(gffNotes$featNotes), split = ";"), "[",1))
+
+# To combine notes with Ontology terms:
+gffNotes$Notes <- paste(gffNotes$featNotes, " (Ontology_term=", gffNotes$Ontology, ")", sep = "")
+
+getNotesSub <- as.data.table(subset(gffNotes, V3 %in% c("gene", "mRNA", "tRNA")))
+
+getNotesSub$ID <- sub("ID=", "", getNotesSub$ID)
+getNotesSub$Notes <- sub(" \\(Ontology_term=NA\\)", "", getNotesSub$Notes)
+getNotesSub$Notes <- gsub(" / ", "/", getNotesSub$Notes)
+
+getNotesSub$NoteName <- "Note"
+gffNotesTbl <- subset(getNotesSub, select = c(ID, NoteName, Notes))
+
+setkey(gffNotesTbl, Notes)
+gffNotesTbl <- gffNotesTbl[!"Protein of unknown function"]
+gffNotesTbl <- gffNotesTbl[!"NA"]
+
+write.table(gffNotesTbl, file = paste(metadataAssemblies$postMaker[7], "notes_annot_tbl.txt", sep = ""),
+            append = FALSE, sep = "\t", col.names = TRUE, row.names = F, quote = FALSE)
+
+### To correct the product feild:
+gffProductsTbl <- subset(getNotesSub, select = c(ID, ProductName, Product))
+setkey(gffProductsTbl, Product)
+gffProductsTbl <- gffProductsTbl[!is.na(Product),]
+    
+write.table(gffProductsTbl, file = paste(metadataAssemblies$postMaker[7], "products_annot_tbl.txt", sep = ""),
+            append = FALSE, sep = "\t", col.names = TRUE, row.names = F, quote = FALSE)
+
+# To clear up some global environment space:
+rm(gff, gffNotes, gffNotesTbl, getNotesSub, gffProductsTbl)
+```
+
+After manually editing the products in the products file written out, I combined the product and notes txt files into one annotations file.
+I had to change all Product and Note to lower-case, product note. I also replaced all commas, ",", with "%2C" in this annotations file. 
+I used sed -i 's///g' annotations_file for this. 
+In the Annie.gff, after making a copy, I changed all instances of ;Note=, ;note=, ;Product=, ;product=, ;Ontology_term=,
+to ;ScrapNote=, ;ScrapProduct=, ;Scrap_Ontology=, so that I could update my annotations as well as ditch the Ontology annotations
+that already existed in the Annie gff (I added these terms to notes instead of as separate features).
+$ sed -i 's/;Note=/;ScrapNote=/g' Annie.Gag.genome.edited.gff
+$ sed -i 's/;note=/;ScrapNote=/g' Annie.Gag.genome.edited.gff
+$ sed -i 's/;Product=/;ScrapProduct=/g' Annie.Gag.genome.edited.gff
+$ sed -i 's/;product=/;ScrapProduct=/g' Annie.Gag.genome.edited.gff
+$ sed -i 's/;Ontology_term=/;Scrap_Ontology=/g' Annie.Gag.genome.edited.gff
+$ sed -i 's/;Name=;/;/g' Annie.Gag.genome.edited.gff
+
+
+I then used gag to add my annotations and create the genbank table needed for tbl2asn, using -anno and -ses to ignore empty scaffolds.
+
+After running gag, I must edit the genome.tbl produced:  
+- replace all %2C with commas
+- fix partial tRNA locations
+
+```{r}
+pathProtFasOrtho <- "/isilon/cfia-ottawa-fallowfield/users/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/orthofinderAnalysis/proteinFasta"
+
+
+# qsub -pe smp 20 -S /bin/bash orthoFinderTest1.sub
+```
 

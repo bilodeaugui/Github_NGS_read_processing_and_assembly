@@ -28,7 +28,7 @@ lapply(scriptsl, source)
 User: 
 Define the path to the shared folder where the main working directory will be.
 ```{r setting_the_main_directory, cache=TRUE}
-sharedPath <- "/isilon/cfia-ottawa-fallowfield/users/girouxeml/PIRL_working_directory/"
+sharedPath <- "/home/CFIA-ACIA/girouxeml/PIRL_working_directory/"
 ```
 
 User:
@@ -39,7 +39,7 @@ and making a directory just for these tables is fine too - but the table will be
 directory for this analysis later in the script. It's just important to have a raw, untouched 
 reference for this data kept in a place where you will remember and keep all the other ones you use.
 ```{r metadata_name_and_path, cache=TRUE}
-metadataFileAlternate <- "Pramorum_catFusarium_metadata_IonT_2018.csv"
+metadataFileAlternate <- "lachnellula_metadata_IonT_2017.csv"
 metadataPath <- paste(sharedPath, "References/", metadataFileAlternate, sep = "")
 ```
 
@@ -56,8 +56,8 @@ overall project. We also added Sci2 because the sequencing libraries were made
 on the SciClone robotics instrument, and also represent the second time we 
 generated libraries on that instrument:
 ```{r analysis_and_sequence_directory, cache=TRUE}
-analysis   <- "Fusarium_Pramorum_species_GenomeAn_IonTorrent_2018/"
-seqDataDir <- "IonTorrent_data_2018"
+analysis   <- "Lachnellula_species_GenomeAn_IonTorrent_2017/"
+seqDataDir <- "IonTorrent_data_2017"
 ```
 
 User needs to specify the adapter sequences attached to the sequencing 
@@ -96,7 +96,7 @@ The following paths are to directories where the references, tools and general
 requirements are located, this depends on the directories actually having been 
 put there:
 ```{r user_tools_and_references_dir, cache=TRUE}
-toolsDirPath     <- "/home/CFIA-ACIA/girouxeml/prog/tools/"
+toolsDirPath     <- paste(sharedPath, "tools/", sep = "")
 referencesPath   <- paste(sharedPath, "References/", sep = "")
 fastqPEValidatorPath <- paste(toolsDirPath, "FastqPairedEndValidator.pl", sep = "")
 ```
@@ -184,6 +184,7 @@ The user does not alter the variables below.
 Sys.setenv(PATH=paste('/opt/gridengine/bin/linux-x64',Sys.getenv('PATH'),sep= ':'))
 ```
 
+
 The following chunk will integrate the user-defined variables from the previous chunk into the script.
 ```{r creating_dir_for_analysis, cache=TRUE}
 # Create the analysis directory:
@@ -213,7 +214,8 @@ prinSeqPath      <- "/opt/bio/prinseq-lite/prinseq-lite"
 prinSeqGraphPath <- "/opt/bio/prinseq-lite/prinseq-graphs"
 samtools1Path    <- "/opt/bio/samtools1/bin/samtools1"
 seqPrepPath      <- "/opt/bio/SeqPrep/SeqPrep"
-itsxPath         <- "/opt/bio/ITSx/bin/ITSx"
+itsxPath         <- "/home/CFIA-ACIA/girouxeml/prog/miniconda/bin/ITSx"
+hmmDBITSxPath    <- "/home/CFIA-ACIA/girouxeml/prog/miniconda/bin/ITSx_db/HMMs/"
 ```
 
 Bowtie:
@@ -222,8 +224,7 @@ Creating Bowtie reference index from the fasta file: Not done for Lachnellula wi
 bowind <- "lachwiiRef"
 
 cmd    <- paste(bowtie2BuildPath, 
-                " -f ", pyuuRefPath,
-                " ", paste(referencesPath, bowind, sep = ""),
+                " -f ", pyuuRefPath, " ", paste(referencesPath, bowind, sep = ""),
                 sep = "")
 cmd
 #system(cmd)
@@ -231,20 +232,24 @@ cmd
 
 Below the metadata file specified by the user is copied into the analysis folder and read into R:
 ```{r copy_metadata_to_analysis_dir_and_read, cache=TRUE}
+
 cmd      <- paste("cp ", metadataPath, " ", sharedPathAn, sep = "")
 system(cmd)
 metadata <-  read.table(paste(sharedPathAn, metadataFileAlternate, sep = ""),
-                        sep          = ",",
-                        header       = TRUE,
-                        comment.char = "", 
-                        quote        = "",
-                        as.is        = TRUE)
+                        sep = ",", header = TRUE, comment.char = "", quote = "", as.is = TRUE)
 if(libraryLayout == 2){
     metadata$BaseCallsName <- paste(metadata$LibraryName, "_", 
                                     metadata$ReadDirection, ".fastq", sep = "")
 } else if
 (libraryLayout != 2){
     metadata$BaseCallsName <- paste(metadata$LibraryName, ".fastq", sep = "")
+}
+```
+
+This function will delete qsub temp files that are the sub.e* outputs (error outputs)
+```{r}
+X <- function(path, prefixSub) {
+  system(paste("find ", path, prefixSub, "/", prefixSub, "*", ".sub.e", "*", " -delete ", sep = ""))
 }
 ```
 
@@ -284,8 +289,7 @@ Add the name of the raw fastq files to the metadata table
 ```{r, cache=TRUE}
 if(libraryLayout == 2){
     for(k in 1:nrow(metadata)){
-        metadata$RawFastq <- paste(metadata$LibraryName, "_", 
-                                   metadata$ReadDirection, ".fastq", sep = "")}
+        metadata$RawFastq <- paste(metadata$LibraryName, "_", metadata$ReadDirection, ".fastq", sep = "")}
     } else if
 (libraryLayout != 2){
     for(k in 1:nrow(metadata)){
@@ -359,14 +363,14 @@ Step 1: .gd file generation:
 ```{r, echo=FALSE, cache=TRUE}
 prefix <- "C_PrinSeq_rawGraphs"
 if(libraryLayout == 2){
-    cmd <- MakePrinSeqGraphFiles(metadataRaw, metadataRaw$R1, prefix,
-                                 "rawGraphs", metadataRaw$R2)
+    cmd <- MakePrinSeqGraphFiles(metadataRaw, metadataRaw$R1, prefix, "rawGraphs", metadataRaw$R2)
     suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)} else if
 (libraryLayout != 2){
     cmd <- MakePrinSeqGraphFiles(metadataRaw, metadataRaw$RawFastq, prefix, "rawGraphs")
     suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix)
 }
 ```
+
 Add the name of the raw graphs .gd files to the 
 metadata table:
 ```{r echo = FALSE, cache=TRUE}
@@ -383,10 +387,6 @@ for(k in 1:nrow(metadataRaw)){
     system(paste("cat ", sharedPathAn, prefix, "/", prefix, k, suffix, ".e*", sep = ""))
     cat("\n")}
 ```
-To remove the output files after you are done:
-```{r, echo=FALSE, cache=TRUE}
-RemoveQsubTempFiles(sharedPathAn, prefix)
-```
 
 PrinSeq graph reports of raw reads. 
 Step 2: html file generation:
@@ -396,7 +396,8 @@ cmd <- MakePrinSeqHTML(metadataRaw, prefix, metadataRaw$RawGraphName)
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix2, suffix)
 ```
-
+If ever you need to upload the .gd file on the PrinSeq web server to generate the html files:
+http://edwards.sdsu.edu/cgi-bin/prinseq/prinseq.cgi?report=1 
 You can follow the progress of the PrinSeq graph generation run with the following:
 ```{r, echo=FALSE, cache=TRUE}
 for(k in 1:nrow(metadataRaw)){
@@ -417,15 +418,13 @@ Adapter detection:
 if(libraryLayout == 2){
 for (k in 1:nrow(metadataRaw)) {
   cat(c(k, metadataRaw$R1[k]))
-  system(paste("cat ", pathFastq, metadataRaw$R1[k], 
-               " | head -n 1000000 | grep '", 
+  system(paste("cat ", pathFastq, metadataRaw$R1[k], " | head -n 1000000 | grep '", 
                fwdAdap, "' | wc -l ", sep = ""))
   cat("\n")
   }
     for (k in 1:nrow(metadataRaw)) {
       cat(c(k, metadataRaw$R2[k]))
-      system(paste("cat ", pathFastq, metadataRaw$R2[k], 
-                   " | head -n 1000000 | grep '", 
+      system(paste("cat ", pathFastq, metadataRaw$R2[k], " | head -n 1000000 | grep '", 
                    revAdap, "' | wc -l ", sep = ""))
       cat("\n")
       } 
@@ -433,19 +432,15 @@ for (k in 1:nrow(metadataRaw)) {
 (libraryLayout != 2){
     for (k in 1:nrow(metadataRaw)) {
         cat(c(k, metadataRaw$R1[k]))
-        system(paste("cat ", pathFastq, metadataRaw$RawFastq[k],
-                     " | head -n 1000000 | grep '",
+        system(paste("cat ", pathFastq, metadataRaw$RawFastq[k], " | head -n 1000000 | grep '",
                      fwdAdap, "' | wc -l ", sep = ""))
         cat("\n")
     }
 }
 ```
 
-Adapter removal:  
-Note: THings may need to be edited for non-paired end reads, but seqPrep will not work without 
-specifying forward and reverse reads and forward and reverse outputs. So for non-paired-end reads,
-the forward and reverse input are the same, as are the forward and reverse output, and the extra
-reverse output can be deleted.
+
+Adapter removal:
 ```{r}
 prefix <- "D_SeqPrep_adapter_Removal"
 if(libraryLayout == 2){
@@ -463,10 +458,7 @@ if(libraryLayout == 2){
     cmd <- with(metadataRaw, 
             paste(seqPrepPath, 
                   " -f ", pathFastq, RawFastq,
-                  " -r ", pathFastq, RawFastq,
-                  " -1 ", pathFastq, LibraryName, ".adapRem1.fastq.gz",
-                  " -2 ", pathFastq, LibraryName, ".adapRem2.fastq.gz",
-                  " -B ", revAdap,
+                  " -1 ", pathFastq, LibraryName, ".adapRem.fastq.gz",
                   " -A ", fwdAdap,
                   sep = ""))
 }
@@ -492,49 +484,12 @@ if(libraryLayout == 2){
     }
 }
 ```
-1 Phra1_7964.fastq
-Processing reads... 
-2 Phra2_7974.fastq
-
-3 Fus3_KAS1254.fastq
-\
-Pairs Processed:	5834827
-Pairs Merged:	0
-Pairs With Adapters:	7282
-Pairs Discarded:	13422
-CPU Time Used (Minutes):	42.774000
-Processing reads... -
-Pairs Processed:	10513465
-Pairs Merged:	0
-Pairs With Adapters:	12605
-Pairs Discarded:	18585
-CPU Time Used (Minutes):	75.134667
-Processing reads... 
-|
-Pairs Processed:	27035858
-Pairs Merged:	0
-Pairs With Adapters:	33042
-Pairs Discarded:	109446
-CPU Time Used (Minutes):	187.570167
 
 To remove the output files after you are done:
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
-For single reads, go to the data directory the reads were written to in the chunk for
-prefix <- "D_SeqPrep_adapter_Removal", seqDataDir, and delete the *adapRem2.fastq.gz files. Then rename the
-*adapRem1.fastq.gz to *adapRem.fastq.gz. Add this file name to the metadata directory.  
-Add the name of the adapter-removed fastq:
-```{r}
-metadata$AdapRemFastq <- paste(metadata$ShortName, ".adapRem.fastq", sep = "")
-```
-
-Consider doing some merging for paired-end reads?
-```{r}
-
-
-```
 
 Pre-Processing of Raw Reads using PrinSeq::
 
@@ -553,7 +508,7 @@ trimQualLeft   <- 10  # Consider reducing from 30 to 10 initially
 trimQualRule   <- "lt"
 lcMethod       <- "dust"
 lcThreshold    <- 7
-outGood        <- "processed_AdapRem"    # Define by user
+outGood        <- "processed_merged"    # Define by user
 outBad         <- "null"
 minLen         <- 100        # Consider reducing from 100 to 60? initially
 ```
@@ -582,22 +537,19 @@ prefix <- "C_PrinSeqGraphQualTrim"
 
 # I revised the function, so look to RNASeq script for how to make this work.
 cmd = with(metadata, 
-           paste("gunzip ", pathFastq, AdapRemFastq, ".gz", " && ", prinSeqPath,
-                 " -fastq ",             pathFastq,  AdapRemFastq,
+           paste(prinSeqPath,
+                 " -fastq ",             pathFastq,  RawFastq,
                  " -trim_qual_window ",  trimQualWindow,
                  " -trim_qual_type ",    trimQualType, 
                  " -trim_qual_right ",   trimQualRight,
                  " -trim_qual_rule ",    trimQualRule,
-                 " -out_good ",          paste(pathFastq, LibraryName,
-                                               ".2processedRaw",
-                                              sep = ""),
+                 " -out_good ",          paste(pathFastq, LibraryName, ".2processedRaw", sep = ""),
                  " -out_bad  ",          outBad,
                  " -verbose ",
                  " -no_qual_header ",
-                 " -log ",               sharedPathAn, prefix, "/", 
-                                         LibraryName, ".2processedRaw.log",
+                 " -log ",               sharedPathAn, prefix, "/", LibraryName, ".2processedRaw.log",
                  sep = ""))
-cmd[1]
+
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix, suffix)
 ```
@@ -606,9 +558,7 @@ Add name of quality-filtered reads .fastq files to the metadata
 tabel:
 ```{r}
 for(k in 1:nrow(metadata)){
-  metadata$processed1Fastq <- paste(metadata$LibraryName,
-                                    ".2processedRaw.fastq",
-                                    sep = "") 
+  metadata$processed1Fastq <- paste(metadata$LibraryName, ".2processedRaw.fastq", sep = "") 
 }
 ```
 To remove the output files after you are done:
@@ -621,17 +571,14 @@ we won't need them and the next step in 1-2 will be using the OUTPUT processed
 reads. 
 ```{r}
 prefix <- "C_gzipRaw"
-cmd <- with(metadata, paste("gzip ",
-                            pathFastq,
-                            metadata$AdapRemFastq,
-                            sep=""))
+cmd <- with(metadata, paste("gzip ", pathFastq, metadata$RawFastq, sep=""))
 
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix, suffix)
 ```
+
 To remove the output files after you are done:
 ```{r}
-prefix <- "C_gzipRaw"
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
@@ -656,9 +603,9 @@ for(k in 1:nrow(metadata)){
     system(paste("cat ", sharedPathAn, prefix2, "/", prefix2, k, suffix, ".e*", sep = ""))
     cat("\n")}
 ```
+
 To remove the output files after you are done:
 ```{r}
-prefix2 <- "C2_PrinSeqGraph"
 RemoveQsubTempFiles(sharedPathAn, prefix2)
 ```
 
@@ -682,73 +629,7 @@ MakeQsubs(cmd, prefix3, suffix)
 
 To remove the output files after you are done:
 ```{r}
-prefix3 <- "C3_PrinSeqHtml"
 RemoveQsubTempFiles(sharedPathAn, prefix3)
-```
-
-Second stage of quality pre-processing with PrinSeq:
-Trim left and right, and Poly-A/T tail removal, round 1
-(Only for RNA-seq, not genome sequencing)
-2-1.
-```{r}
-prefix <- "D_PrinSeqTrimLRPolyAT"
-cmd <- with(metadata, 
-            paste("zcat ", pathFastq, processed1Fastq, ".gz", " | ",
-                  prinSeqPath,
-                  " -fastq stdin ",
-                  " -trim_tail_left ",  trimTailLeft,
-                  " -trim_tail_right ", trimTailRight,
-                  " -out_good ",        paste(pathFastq, LibraryName, 
-                                              ".3processed", sep = ""),
-                  " -out_bad  ",        outBad,
-                  " -verbose ",
-                  " -no_qual_header ",
-                  " -log ",             paste(sharedPathAn, prefix, "/", 
-                                              LibraryName, ".3processed.log", 
-                                              sep = ""),
-                  sep = ""))
-
-suffix <- ".sub"  
-MakeQsubs(cmd, prefix, suffix)
-```
-(Only for RNA-seq, not genome sequencing)
-To remove the output files after you are done:
-```{r}
-prefix <- "D_PrinSeqTrimLRPolyAT"
-RemoveQsubTempFiles(sharedPathAn, prefix)
-```
-(Only for RNA-seq, not genome sequencing)
-Add name of Poly-A/T, left and right trimmed reads .fastq files to the 
-metadata tabel:
-```{r}
-for(k in 1:nrow(metadata)){
-  metadata$processed2Fastq <- paste(metadata$LibraryName, ".3processed.fastq", sep = "") 
-}
-```
-
-
-2-2.
-(Only for RNA-seq, not genome sequencing)
-Generate PrinSeq graph files (.gd) for the fastq generated previously:
-This works, but the temp files are large - so beware of disc usage.
-```{r}
-prefix2 <- "D2_PrinSeqGraphTrimLRPolyAT"
-cmd <- MakePrinSeqGraphFiles(metadata, metadata$processed2Fastq,
-                             prefix, "3processed")
-
-# prefix5 <- "D5_PrinSeqGraphTrimLRPolyAT"
-# cmd <- MakePrinSeqGraphFiles2(metadata, metadata$processed2Fastq,
-#                              prefix, "3processed")
-
-suffix <- ".sub"  
-MakeQsubs(cmd, prefix2, suffix)
-```
-
-(Only for RNA-seq, not genome sequencing)
-To remove the output files after you are done:
-```{r}
-prefix2 <- "D2_PrinSeqGraphTrimLRPolyAT"
-RemoveQsubTempFiles(sharedPathAn, prefix2)
 ```
 
 Gzip the fastq reads that were output to the PrinSeq processing in step 2-1, 
@@ -756,135 +637,14 @@ input reads stayed compressed - no need to compress those. Had to stop this
 testing of submitting by qsub.
 ```{r}
 prefix3 <- "C_gzipProcessed"
-cmd <- with(metadata, paste("gzip ", 
-                            pathFastq, 
+
+cmd <- with(metadata, paste("gzip ", pathFastq, 
                            #  metadata$processed2Fastq,
-                            metadata$processed1Fastq,
-                            sep = ""))
-
-# sapply(cmd, function(x) system(x))
-
+                            metadata$processed1Fastq, sep = ""))
 # suffix <- ".sub"  
 MakeQsubs(cmd, prefix3, suffix)
 ```
 
-To remove the output files after you are done:
-```{r}
-prefix3 <- "C_gzipProcessed"
-RemoveQsubTempFiles(sharedPathAn, prefix3)
-```
-
-(Only for RNA-seq, not genome sequencing)
-Add name of trimmedLR/PolyAT reads .gd files to the metadata tabel: (Done)
-```{r}
-for(k in 1:nrow(metadata)){
-  metadata$processed2GraphName <- paste(metadata$LibraryName, ".3processed.gd", sep = "") 
-}
-```
-
-
-2-3.
-(Only for RNA-seq, not genome sequencing)
-PrinSeq graph reports of second-stage html file generation:
-```{r}
-prefix4 <- "D4_PrinSeq_html"
-cmd <- MakePrinSeqHTML(metadata, prefix, metadata$processed2GraphName)
-
-suffix <- ".sub"  
-MakeQsubs(cmd, prefix4, suffix)
-```
-
-(Only for RNA-seq, not genome sequencing)
-To remove the output files after you are done:
-```{r}
-RemoveQsubTempFiles(sharedPathAn, prefix4)
-```
-
-(Only for RNA-seq, not genome sequencing)
-Third stage of quality pre-processing with PrinSeq:
-Poly-A/T tail removal, round 2:
-Repeat poly tails trimming, because after trimming ends that had AAAAATTTTT 
-that has been trimmed for the poly-T will still have the poly-A string.
-3-1.
-```{r}
-prefix <- "E_PrinSeq2ndPolyAT"
-
-cmd <- with(metadata, 
-            paste("zcat ", pathFastq, processed2Fastq, ".gz", " | ",
-                  prinSeqPath,
-                  " -fastq stdin ",
-                  " -trim_tail_left ",  trimTailLeft,
-                  " -trim_tail_right ", trimTailRight,
-#                   " -out_good ",        paste(pathFastq, LibraryName,
-#                                               ".4processed", sep = ""),
-                  " -out_good stdout ",
-                  " -out_bad  ",        outBad,
-                  " -verbose ",
-                  " -no_qual_header ",
-                  " -log ",             paste(sharedPathAn, prefix, "/", 
-                                              LibraryName, ".4processed.log", 
-                                              sep = ""),
-                  " |  gzip > ", paste(pathFastq, LibraryName,
-                                       ".4processed.fastq.gz", sep = ""), 
-                  sep = ""))
-
-
-suffix <- ".sub"  
-MakeQsubs(cmd, prefix, suffix)
-```
-(Only for RNA-seq, not genome sequencing)
-To remove the output files after you are done:
-```{r}
-RemoveQsubTempFiles(sharedPathAn, prefix)
-```
-(Only for RNA-seq, not genome sequencing)
-Add name of 2nd polyAT trimmed reads .fastq files to the 
-metadataAdapRM tabel:
-```{r}
-for(k in 1:nrow(metadata)){
-  metadata$processed3Fastq <- paste(metadata$LibraryName, ".4processed.fastq", sep = "") 
-}
-```
-
-3-2.
-(Only for RNA-seq, not genome sequencing)
-Generate PrinSeq graph files (.gd) for the fastq generated the previously:
-```{r}
-prefix2 <- "E2_PrinSeq2ndTrimPolyATgraphs"
-
-cmd <- MakePrinSeqGraphFiles2(metadata, metadata$processed3Fastq, prefix, "4processed")
-
-suffix <- ".sub"  
-MakeQsubs(cmd, prefix2, suffix)
-```
-
-(Only for RNA-seq, not genome sequencing)
-To remove the output files after you are done:
-```{r}
-RemoveQsubTempFiles(sharedPathAn, prefix2)
-```
-
-(Only for RNA-seq, not genome sequencing)
-Add name of second trimmed PolyAT reads .gd files to the metadata tabel:
-```{r}
-for(k in 1:nrow(metadata)){
-  metadata$processed3GraphName <- paste(metadata$LibraryName, ".4processed.gd", sep = "") 
-}
-```
-
-
-3-3.
-(Only for RNA-seq, not genome sequencing)
-PrinSeq graph reports of third-stage html file generation:
-```{r}
-prefix3 <- "E3_PrinSeq_html"
-
-cmd <- MakePrinSeqHTML(metadata, prefix, metadata$processed3GraphName)
-
-suffix <- ".sub"  
-MakeQsubs(cmd, prefix3, suffix)
-```
-(Only for RNA-seq, not genome sequencing)
 To remove the output files after you are done:
 ```{r}
 RemoveQsubTempFiles(sharedPathAn, prefix3)
@@ -895,6 +655,7 @@ Filtering of reads by complexity (DUST) and minimum length
 4-1.
 ```{r}
 prefix <- "D_PrinSeqDustMinLen"
+
 cmd <- with(metadata, 
             paste("zcat ", pathFastq, processed1Fastq, ".gz", " | ",
                   prinSeqPath,
@@ -906,10 +667,12 @@ cmd <- with(metadata,
                   " -out_bad  ",       outBad,
                   " -verbose ",
                   " -no_qual_header ",
-                  " -log ",            paste(sharedPathAn, prefix, "/", LibraryName, ".3processed.log", sep = ""),
+                  " -log ",            paste(sharedPathAn, prefix, "/", LibraryName, ".3processed.log", 
+                                             sep = ""),
                   " |  gzip > ", paste(pathFastq, LibraryName, ".3processed.fastq.gz", sep = ""), 
                   sep = ""))
-cmd[1]
+
+
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix, suffix)
 ```
@@ -918,6 +681,9 @@ MakeQsubs(cmd, prefix, suffix)
 ```{r}
 for(k in 1:nrow(metadata)){
   metadata$processed2Fastq <- paste(metadata$LibraryName, ".3processed.fastq", sep = "") 
+}
+for(k in 1:nrow(metadata)){
+  metadata$finalProcessedPath <- paste(pathFastq, "/", metadata$LibraryName, ".3processed.fastq", sep = "") 
 }
 ```
 
@@ -930,7 +696,9 @@ RemoveQsubTempFiles(sharedPathAn, prefix)
 Generate PrinSeq graph files (.gd) for the fastq generated the previously:
 ```{r}
 prefix2 <- "D2_PrinSeqDustMinLength"
+
 cmd <- MakePrinSeqGraphFiles2(metadata, metadata$processed2Fastq, prefix, "3processed")
+
 suffix <- ".sub"  
 MakeQsubs(cmd, prefix2, suffix)
 ```
@@ -944,24 +712,12 @@ for(k in 1:nrow(metadata)){
 
 To remove the output files after you are done:
 ```{r}
-prefix2 <- "D2_PrinSeqDustMinLength"
 RemoveQsubTempFiles(sharedPathAn, prefix2)
 ```
 
-4-3.
-PrinSeq graph reports of third-stage html file generation:
 ```{r}
-prefix3 <- "D3_PrinSeq_html"
-
-cmd <- MakePrinSeqHTML(metadata, prefix, metadata$processed2GraphName)
-
-suffix <- ".sub"  
-MakeQsubs(cmd, prefix3, suffix)
-```
-
-To remove the output files after you are done:
-```{r}
-RemoveQsubTempFiles(sharedPathAn, prefix3)
+system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
+# RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
 Get ITS sequences:
@@ -993,86 +749,68 @@ MakeQsubs(cmd, prefix, suffix)
 
 metadata$processed2Fasta <- paste(metadata$LibraryName, ".3processed.fasta", sep = "")
 ```
-To remove the output files after you are done:
-```{r}
-RemoveQsubTempFiles(sharedPathAn, prefix)
-```
 
-3rd: Use fasta in ITSx perl script (remake of FungalITSextractor.pl):
+3rd: Use ITSx to extract ITS sequences:
+Note: The hmmer version on the biocluster, with the /opt/bio/ITSx/bin/HMMs is outdated and causes ITSx to crash.
+I downloaded hmmer-3.1b2 locally in /home/CFIA-ACIA/girouxeml/prog/hmmer-3.1b2 and copied over the /bin/HMMs directory
+to the ~/prog/hmmer-3.1b2/bin directory and re-ran the ITSx program with the --reset T option and the -p ~/prog/hmmer-3.1b2/bin/HMM
+option to point to the local HMM directory, where I also have write privileges. This allows the ITSx program to 
+rebuild the problematic hmm files and successfully run. The command line performed was:
+$ perl /opt/bio/ITSx/bin/ITSx -i ../IonTorrent_data_2018/Phra1_7964.3processed.fasta -t F -p ~/prog/hmmer-3.1b2/bin/HMMs/ --save_regions all --table T --reset T --cpu 16 -o Phra1_7964   
+After creating the bash files inthe chunk below, I navigate to the directory they are in and run each with:  
+$ qsub -pe smp 20 -cwd -S /bin/bash "name of bash file"   
+Otherwise the multi-threaded, parallel cpu options are not used with the .sh qsub script.  
+
+*** Over here - ran this on 11June2018, and there is consistently an error - I think I need to update the database used.  
+Also note that it takes a long time, and perhaps I should have added the option for threaded on top of --cpu.
 ```{r}
-#fungalITSpath <- "/opt/bio/FungalITSextractor/FungalITSextractor.pl"
 prefix <- "F3_ITS_ITSx"
 cmd    <- with(metadata,
                paste("perl ", itsxPath,
                      " -i ", paste(pathFastq, processed2Fasta, sep = ""),
-                     " -t F --save_regions all --table T --cpu 20 --concat T ",
-                     " -o ", LibraryName, 
+                     " -p ", hmmDBITSxPath, 
+                     " -t F --save_regions all --table T --reset T --cpu 20 --multi_thread T ",
+                     " -o ", LibraryName,
                      sep = ""))
 cmd[1]
-suffix <- ".sub" 
+suffix <- ".sub"
 MakeQsubs(cmd, prefix, suffix, node)
-# To speed things up, on the command line:
-# qsub -pe smp 20 -S /bin/bash "name of bash file"
 ```
 
+Gather fasta data required for all assemblies:
 ```{r}
-system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
-RemoveQsubTempFiles(sharedPathAn, prefix)
+library(data.table)
+metadata_dt <- as.data.table(metadata)
+setkey(metadata_dt, ScientificName, LibraryName, processed2Fastq, finalProcessedPath)
+
+head(metadata_dt)
+key(metadata_dt)
+metadataAssembly <- metadata_dt[, c("ScientificName", "LibraryName", "processed2Fastq", "finalProcessedPath"), with=FALSE]
+sppAbbrv <- c("Fus3", "Phra1", "Phra2" )
+metadataAssembly$SppAbbr <- sppAbbrv
 ```
 
-
-############################ Looking into sets with bimodal GC distributions ###############################
-Reads show strong bimodal GC content distribution - suggestive of contamination
-To investigate possible contaminating species, will blastn a small subset of
-the fastq reads to see where the strongest matches are.
+Did not complete the mapping for the following - as of June 2018:
+Mapping against reference Assemblies:
 ```{r}
-
-# 1. Convert fastq to fasta:
-# seqtk fq2fa wholeGen_Lawii.5processed.fastq.gz > wholeGen_Lawii.5processed.test.fasta
-
+fus3RefAssem   <- "refFastaAssemblyEnsembleFungi_Fusarium_langsethiae_JXCE01.fasta"
+fus3RefAssPath <- paste(referencesPath, fus3RefAssem, sep = "")
+phraRefAssem   <- "refAssemblyEnsemble_Phytophtora_ramorum_AAQX01.fasta"
+phraRefAssPath <- paste(referencesPath, phraRefAssem, sep = "")
 ```
 
+Assembling with Newbler
+Must first gunzip the fastq as Newbler can't use compressed files!
 ```{r}
+prefix <- "GunZipForNewbler"
 
-# 2. Split fasta to get a smaller set to blast:
-
-# awk 'BEGIN {n_seq=0;} /^>/ {if(n_seq%1000==0){file=sprintf("myseq%d.fa",n_seq);} 
-# print >> file; n_seq++; next;} { print >> file; }' < sequences.fa
-
-```
-
-```{r}
-# Alternate option of checking contaminants: parse fastq reads by GC content
-# using PrinSeq:
-
-cmd <- paste("perl ", prinSeqPath, " -h", sep = "")
-system(cmd)
-
-rangeGC <- "10-35"
-
-prefix <- "G_PrinSeqDustGCRange35"
-
-cmd <- with(metadata, 
-            paste("zcat ", pathFastq, processed4Fastq, ".gz", " | ",
-                  prinSeqPath,
-                  " -fastq stdin ",
-                  " -range_gc ",       rangeGC,
-                  " -out_good stdout ",
-                  " -out_bad  ",        paste(pathFastq, LibraryName, 
-                                              ".5processed.GCrange35plus", 
-                                              sep = ""),
-                  " -verbose ",
-                  " -no_qual_header ",
-                  " -log ",             paste(sharedPathAn, prefix, "/", 
-                                              LibraryName, 
-                                              ".5processed.GCrange.log", 
-                                              sep = ""),
-                  " |  gzip > ", paste(pathFastq, LibraryName,
-                                       ".5processed.GCrange35minus.fastq.gz", 
-                                       sep = ""), 
+for(i in 1:nrow(metadataAssembly)){
+    cmd <- with(metadataAssembly, 
+            paste(" gunzip ", paste(metadataAssembly$finalProcessedPath, ".gz", sep = ""),
                   sep = ""))
+}
 
-suffix <- ".sub"  
+suffix <- ".sub" 
 MakeQsubs(cmd, prefix, suffix)
 ```
 
@@ -1081,219 +819,90 @@ To remove the output files after you are done:
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
 
-
-Add the name of the contaminant/bad range gc to metadata (can remove later, 
-or adjust):
-```{r}
-for(k in 1:nrow(metadata)){
-  metadata$processed5.GC35minusFastq <- paste(metadata$LibraryName, ".5processed.GCrange35minus.fastq", sep = "") 
-}
-```
-
-Generate PrinSeq graph files (.gd) for the fastq generated the previously:
-```{r}
-prefix2 <- "G2_PrinSeqGCRangegraphs35"
-
-cmd <- MakePrinSeqGraphFiles2(metadata, metadata$processed5.GC35minusFastq,prefix, "5processed.GCrange35minus")
-
-suffix <- ".sub"  
-MakeQsubs(cmd, prefix2, suffix)
-```
-
-To remove the output files after you are done:
-```{r}
-RemoveQsubTempFiles(sharedPathAn, prefix2)
-```
-
-Add the name of the .gd graph files to the metadata table
-```{r}
-for(k in 1:nrow(metadata)){
-  metadata$processed5.GC35minusGraphName <- paste(metadata$LibraryName, ".5processed.GCrange35minus.gd",
-                                                  sep = "") 
-}
-```
-
-Generate html from the .gd graph files:
-```{r}
-prefix3 <- "G3_PrinSeq_html35"
-
-cmd <- MakePrinSeqHTML(metadata, prefix, metadata$processed5.GC35minusGraphName)
-
-suffix <- ".sub"  
-MakeQsubs(cmd, prefix3, suffix)
-```
-
-To remove the output files after you are done:
-```{r}
-RemoveQsubTempFiles(sharedPathAn, prefix3)
-```
-
-```{r}
-nameMetadata <- "Lachnellula_willkommii_WholeGen_metatdata.csv"
-write.table(metadata,
-            file = file.path(sharedPathAn, nameMetadata),
-            sep       = ",",
-            row.names = TRUE, 
-            col.names = NA, 
-            quote     = FALSE)
-```
-
-
-Blast qsub ncbi subset:
-```{r}
-ncbiDbPath     <- "/isilon/biodiversity/reference/ncbi/blastdb/reference/nt/nt"
-ncbiBlastnPath <- "/opt/bio/ncbi-blast+/bin/blastn"
-testGenSubset  <- paste(pathFastq, "wholeGen_Lawii.5processed.GCrange35plus.test.fasta", sep = "")
-blastnOutFrmt  <- paste(" '", 
-                        "6", " qseqid", " sallacc", " pident", " length", 
-                        " mismatch", " gapopen", " qstart", " qend", " sstart", 
-                        " send", " evalue", " bitscore", 
-                        "'",
-                        sep = "") 
-maxTargetsSeqs <- 1
-
-cmd <- paste(ncbiBlastnPath,
-             " -db ",     ncbiDbPath,
-             " -query ",  testGenSubset,
-             " -max_target_seqs ", maxTargetsSeqs,
-             " -outfmt ", blastnOutFrmt,
-             " -out ",    paste(testGenSubset, ".bls",
-                                sep = ""),
-             sep = "")
-
-prefix <- "testContamLachnWill_35plus"
-suffix <- ".sub" 
-MakeQsubs(cmd, prefix, suffix, node)
-```
-
-Try to assemble the mitochondrial genome - Newbler:
 ```{r}
 newblerPath <- "/opt/bio/454/bin/newbler"
 runAssPath  <- "/opt/bio/454/bin/runAssembly"
 
-cmd <- with(metadata,
-            paste(runAssPath,
-                  " -o ", paste(pathFastq, "Assembly1_NewblerAllGCrange", sep = ""),
-                  " ", pathFastq, processed4Fastq,
-                  sep = ""))
-prefix <- "Assembly1_NewblerAllGCrange"                
+prefix <- "Assembly_Newbler"
+node <- "20"
+for(i in 1:nrow(metadataAssembly)){
+    cmd <- with(metadataAssembly, 
+                paste(runAssPath, 
+                      " -o ", paste(sharedPath, analysis, prefix, "/", metadataAssembly$LibraryName, sep = ""),
+                      " -cpu ", node, " ",    paste(metadataAssembly$finalProcessedPath, sep = ""), 
+                      sep = ""))
+}
+cmd[1] # cmd to re-run Lari only due to previous run crash   
 suffix <- ".sub" 
-MakeQsubs(cmd, prefix, suffix, node)
+
+MakeQsubs(cmd, prefix, suffix)
+# MakeQsubs(cmd[1], prefix2, suffix, node) # For re-running Lari due to previous run crash.
 ```
 
-Make a fasta file that has only contig00001 (largest contig assembled with Newbler), 
-this appears to be our mitochondrial genome sequence as a blast of this resulted 
-in hits to mitochondrial genomes of related species in the helotiales.
+To remove the output files after you are done:
 ```{r}
-allContigsPath  <- paste(pathFastq, "projdir-NewblerAssembly_of_wholeGen_Lawii5processed_AllGCrange/NewblerAllGCrange/454AllContigs.fna", sep = "")
-allContigs      <- readAAStringSet(paste(allContigsPath), format = "fasta")
-allContigsNames <- names(allContigs)
-mitoContigName  <- subset(allContigsNames, grepl("contig00001", allContigsNames))
-mitoContigSub   <- allContigs[which(names(allContigs) %in% mitoContigName)]
-writeXStringSet(mitoContigSub, file=paste(pathFastq, "mitoRef.fasta", sep=""), append=FALSE, format="fasta")
-
-pathMitofasta   <- paste(pathFastq, "mitoRef.fasta", sep="") 
-```
-
-Build a bowtie2 reference index for the mitochondrial genome contig:
-```{r}
-bowind <- "mitoRef"
-cmd    <- paste(bowtie2BuildPath, 
-                " -f ", pathMitofasta,
-                " ", paste(pathFastq, bowind, sep = ""),
-                sep = "")
-system(cmd)
-```
-
-Map reads against the mitochondrial reference and extract unmapped reads,
-these will be the nuclear genome reads set (non-contaminants), to a new fastq 
-file (no_mito.fastq) direclty with the --un flag:
-```{r}
-
-bowtie2alignPath <- "/opt/bio/bowtie2/bowtie2"
-
-cmd <- with(metadata,
-            paste(bowtie2alignPath,
-                  " --un ", paste(pathFastq, "noMito", "_", processed4Fastq, sep = ""),
-                  " -x ",   paste(pathFastq, bowind, sep = ""),
-                  " -U ",   paste(pathFastq, processed4Fastq, sep = ""),
-                  " -S ",   paste(pathFastq, "mitoContaminantsAlignment.sam", sep = ""),
-                  #" --no-hd ",
-                  #" --no-sq ",
-                  sep = ""
-                  ))
-system(cmd)
-
-pathLawiiNoMito <- paste(pathFastq, "noMito", "_", metadata$processed4Fastq, sep = "")
-
-# or:
-# pathLawiiNoMito <- paste(pathFastq, "noMito_wholeGen_Lawii.5processed.fastq", sep = "")
-
-cmd <- paste(samtools1Path,
-             " view ",
-             " -f 4 ", paste(pathFastq, "mitoContaminantsAlignment.sam", sep = ""),
-             " > ",    paste(pathFastq, "noMito_wholeGen_Lawii.5processed", ".sam", sep = ""),
-             sep = "")
-system(cmd)
-```
-
-Redo assembly with Newbler on the read set that has mitochondrial reads removed:
-```{r}
-
-newblerPath <- "/opt/bio/454/bin/newbler"
-runAssPath  <- "/opt/bio/454/bin/runAssembly"
-
-cmd <- with(metadata, paste(runAssPath,
-                  " -o ", paste(pathFastq, "Assembly2_NewblerNoMito", sep = ""),
-                  " ",    pathLawiiNoMito, sep = ""))
-prefix <- "Assembly2_NewblerNoMito"                
-suffix <- ".sub" 
-MakeQsubs(cmd, prefix, suffix, node)
-```
-
-Redo assembly with Newbler on the mitochondrial sequence contig0001. 
-Assemble all reads from wholeGen_Lawii.5processed.fastq to contig0001.
-```{r}
-cmd <- paste(runAssPath,
-             " -o ", paste(pathFastq, "Assembly3_Mitochondrial", sep = ""),
-             " ", paste(pathFastq, "Geneious_Used_Reads_mitochondrial-mapped_to_contig01.fasta", sep = ""),
-             sep = "")
-prefix <- "Assembly3_Mitochondrial"                
-suffix <- ".sub" 
-MakeQsubs(cmd, prefix, suffix, node)
-```
-
-Get the ITS sequence? FungalITSextractor perl script:
-1st: get fasta file from fastq:
-```{r}
-cmd <- paste(" seqtk fq2fa ", pathLawiiNoMito, " > ", 
-             paste(pathFastq, "noMito_wholeGen_Lawii.5processed.fasta", sep = ""),
-             sep = "")
-
-prefix <- "fastq2fasta_NoMito"                
-suffix <- ".sub" 
-MakeQsubs(cmd, prefix, suffix, node)
-```
-
-2nd: Use fasta in ITSx perl script (remake of FungalITSextractor.pl):
-```{r}
-#fungalITSpath <- "/opt/bio/FungalITSextractor/FungalITSextractor.pl"
-itsxPath      <- "/opt/bio/ITSx/bin/ITSx"
-cmd <- paste(" perl /opt/bio/ITSx/bin/ITSx ",
-             " -i ", paste(pathFastq, "noMito_wholeGen_Lawii.5processed.fasta", sep = ""),
-             " -t F ",      # F here is to specify fungal
-             " --save_regions all ", # This says I want all outputs, not just ITS 1 and 2
-             " --table T ", # This is because I want a tble (True)
-             " --cpu 6 ",   # To run this in parallel
-             sep = "")
-             
-
-prefix <- "ITSx_3"                
-suffix <- ".sub" 
-MakeQsubs(cmd, prefix, suffix, node)
-```
-
-```{r}
-system("/opt/gridengine/bin/linux-x64/qstat") # Remove qsub temp when qstat returns nothing.
 RemoveQsubTempFiles(sharedPathAn, prefix)
 ```
+
+Add the assembled contigs paths from Newbler to the metadata table:
+```{r}
+for(k in 1:nrow(metadataAssembly)){
+  metadataAssembly$NewblerFnaPath <- paste(sharedPathAn, "Assembly_Newbler/", metadataAssembly$LibraryName,
+                                           "/454LargeContigs.fna", sep = "")}
+```
+
+Must first gzip the fastq after Newbler assembly to save space!
+```{r}
+prefix <- "GZipAfterNewbler"
+
+for(i in 1:nrow(metadataAssembly)){
+    cmd <- with(metadataAssembly, 
+            paste(" gzip ", paste(metadataAssembly$finalProcessedPath, sep = ""),
+                  sep = ""))
+}
+cmd
+suffix <- ".sub" 
+MakeQsubs(cmd, prefix, suffix)
+```
+*** Over here!!!
+To remove the output files after you are done:
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+We need to fix the Newbler Assembly contig names:
+Key issue I had was that there were sequence descriptions after the sequence name
+of each contig inthe assembly files from Newbler, and this was causing the tool to be unable to 
+create files from and process any of the sequences. If you want to remove the description and 
+if your headers are structured like that: 
+"> + id + space + description"
+
+Once this part was removed, the tool worked.
+
+i.e.,
+
+>contig00001 1203988 12890445
+agccctgcgatcgatcgggctagctagc
+
+using sed:
+$ sed -e 's/^\(>[^[:space:]]*\).*/\1/' Lari_assembly_EG2017.fna > Lari_assembly_EG2017_mod.fna
+
+new format:
+>contig00001
+agccctgcgatcgatcgggctagctagc
+
+Add the name of the fixed assemblies to the metadata table:
+```{r}
+metadataAssembly$FixedNewAssemName <- paste(sharedPathAn, "Assembly_Newbler/", metadataAssembly$LibraryName, "/",
+                                            metadataAssembly$SppAbbr, "_assemblyLargeContigs_EG2018_mod.fna", sep = "")
+```
+
+Print the metadata tables:
+```{r}
+write.table(metadata, file = file.path(referencesPath, "fus_phra_metadata_processed_june2018.csv"),
+            sep = ",", row.names = TRUE, col.names = NA, quote = FALSE)
+
+write.table(metadataAssembly, file = file.path(referencesPath, "fus_phra_metadata_Assembly_june2018.csv"),
+            sep = ",", row.names = TRUE, col.names = NA, quote = FALSE)
+```
+

@@ -1,0 +1,140 @@
+---
+title: "GAG - genome annotation"
+author: "Emily Giroux"
+date: "10/5/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Installing the required packages for R:
+# This is to be done in the R command line and not in R studio
+#source("https://www.Bioconductor.org/biocLite.R")
+#biocLite("BiocUpgrade")
+
+
+Getting started in R: Set the working directory > setwd("~/") Check version installed
+```{r global_options, include=FALSE}
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60), tidy = TRUE, fig.align='center')
+```
+
+
+This will help us when finding our files to source functions:
+```{r sourcing_my_functions}
+install.packages("rprojroot")
+library(rprojroot)
+# We specify ours is an RStudio project
+# The root object contains a function that will help us locate our package r files
+# regarless of our current working directory
+root <- rprojroot::is_rstudio_project
+scriptsPath <- root$make_fix_file(".")("R")
+scripts  <- dir(root$find_file("R", path = root$find_file()))
+scriptsl <- paste(scriptsPath, scripts, sep = "//")
+lapply(scriptsl, source)
+```
+
+User: 
+Define the path to the shared folder where the main working directory will be.
+```{r setting_the_main_directory, cache=TRUE}
+sharedPath <- "/home/CFIA-ACIA/girouxeml/PIRL_working_directory/"
+```
+
+Path to Genome Annotation GitHub (GAG) tool (python):
+```{r}
+gagPath <- "/home/CFIA-ACIA/girouxeml/prog/gag/genomeannotation-GAG-40ea515/gag.py"
+
+testGAG <- paste("python ", gagPath, " --help", sep = "")
+system(testGAG)
+```
+Import the gff, fna, and annotation files to inspect their formatting:
+```{r}
+library(data.table)
+library("dplyr")
+
+fnaPath <- paste(sharedPathAn, 
+                 "Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/FromB2GSupport_Lsue_assembly_EG_2017_mod_removedlLessThan200_contig00022trim.fna", 
+                 sep = "") 
+gffPath <- paste(sharedPathAn, "Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Blast2GO_gff_without_contig.gff", sep = "")
+annotPath <- paste(sharedPathAn, "Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Lsue_blast2go_annot_05Oct2017_1059.annot", 
+                   sep = "")
+annotDesPath <- paste(sharedPathAn, "Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Lsue_blast2go_annotation_descriptions_05Oct2017_1128.txt", 
+                      sep = "")
+gffExportPath <- paste(sharedPathAn, "Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/blast2go_gff_export_05Oct2017_1132.gff", 
+                       sep = "")
+gafPath <- paste(sharedPathAn, "Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Lsue_blast2go_gaf_05Oct2017_1227.txt", sep = "")
+
+
+gff <- fread(gffPath, sep = "\t", header = FALSE)
+annot <- fread(annotPath, sep = "\t", header = FALSE, fill = TRUE)
+annotDes <- fread(annotDesPath, sep = "auto", header = TRUE, fill=TRUE)
+gffExport <- fread(gffExportPath, sep = "\t", header = FALSE)
+gaf <- fread(gafPath, sep = "\t", header = FALSE)
+
+library(Biostrings)
+fna <- readDNAStringSet(fnaPath)
+
+
+makerMapIDsPath <- "/home/CFIA-ACIA/girouxeml/prog/scripts_pl/maker_map_ids.pl"
+makerMapFastaIdsPath <- "/home/CFIA-ACIA/girouxeml/prog/scripts_pl/map_fasta_ids.pl"
+makerMapGffIdsPath <- "/home/CFIA-ACIA/girouxeml/prog/scripts_pl/map_gff_ids.pl"    
+makerMapDataIdsPath <- "/home/CFIA-ACIA/girouxeml/prog/scripts_pl/map_data_ids.pl"
+
+testMakerMapIds <- paste("perl ", makerMapGffIdsPath, sep = "")
+system(testMakerMapIds)
+
+# Step 1: make an ID map file
+prefixIDs <- "LSUE_"
+justify <- 6
+
+cmd <- paste("perl ", makerMapIDsPath, 
+             " --prefix ", prefixIDs,
+             #" --suffix ", 
+             " --abrv_gene G ",
+             " --abrv_tran T ",
+             " --justify ", justify,
+             " ", gffPath, " > ",
+             paste(sharedPathAn, "Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Maker_Map_Lsue.map", sep = ""),
+             sep = "")
+
+system(cmd)
+
+# Step 2: Map gff ids
+cmd <- paste("cp ", gffPath, " ", 
+             paste(sharedPathAn, "Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/contig00047_Lsue_Renamed.gff", sep = ""),
+             sep = "")
+system(cmd)
+
+cmd <- paste("perl ", makerMapGffIdsPath, " ",
+             paste(sharedPathAn, "Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Maker_map_contig00047_Lsue.map", sep = ""),
+             " ", 
+             paste(sharedPathAn, "Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/contig00047_Lsue_Renamed.gff", sep = ""),
+             sep = "")
+
+system(cmd)
+
+# Step 3: Map fasta IDs
+b2gAAFasta <- "/home/CFIA-ACIA/girouxeml/PIRL_working_directory/Lachnellula_species_GenomeAn_IonTorrent_2017/Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Lsue_blast2go_fasta_05Oct2017_1535.fasta"
+
+cmd <- paste("cp ", b2gAAFasta, " ", 
+             paste(sharedPathAn, "Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/Lsue_blast2go_fasta_05Oct2017_1535.Renamed.fasta", sep = ""),
+             sep = "")
+system(cmd)
+
+cmd <- paste("perl ", makerMapFastaIdsPath, " ",
+             )
+
+
+
+names(fna) <- sub("^contig", "LSUE_G", names(fna))
+writeXStringSet(fna, file=paste(sharedPathAn, "Lachnellula_suecica/Lsue_NCBI_files/Lsue_NCBI/contig00047_newName.fna", 
+                                sep = ""), append = FALSE, format = "fasta")
+
+
+
+
+
+
+```

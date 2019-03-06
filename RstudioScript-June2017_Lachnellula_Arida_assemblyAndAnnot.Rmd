@@ -1,0 +1,86 @@
+---
+title: "reprocessing_assembly_annotation_Larida_"
+author: "Emily Giroux"
+date: '2017-07-05'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+prefix <- "D_PrinSeq_Larida_maxLength"
+
+cmd <- with(metadataAssembly, 
+            paste(prinSeqPath,
+                  " -fastq ", metadataAssembly$finalProcessedPath[1],
+                  " -max_len 450 ",
+                  " -out_good stdout ",
+                  " -out_bad  ",       outBad,
+                  " -verbose ",
+                  " -no_qual_header ",
+                  " -log ",            paste(sharedPathAn, prefix, "/", 
+                                             LibraryName[1], ".3processed.log", 
+                                             sep = ""),
+                  " |  gzip > ", paste(pathFastq, LibraryName[1],
+                                       ".4processed.fastq.gz", sep = ""), 
+                  sep = ""))
+
+
+suffix <- ".sub"  
+MakeQsubs(cmd, prefix, suffix)
+
+```
+
+To remove the output files after you are done:
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix)
+```
+
+Add name of final processed L. arida file to metadata tabel:
+```{r}
+metadataAssembly$finalProcessedFasta[1] <- paste(metadataAssembly$LibraryName[1], ".4processed.fastq", sep = "")
+metadataAssembly$finalProcessedPath[1] <- paste(pathFastq, "/", metadataAssembly$finalProcessedFasta[1], sep = "")
+```
+
+
+```{r}
+prefix2 <- "D2_PrinSeq_Larida_maxLength"
+
+cmd <- MakePrinSeqGraphFiles2(metadataAssembly, metadataAssembly$finalProcessedFasta[1], prefix, "4processed")
+
+suffix <- ".sub"  
+MakeQsubs(cmd[1], prefix2, suffix)
+```
+To remove the output files after you are done:
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix2)
+```
+
+Add name of Dust and MinLen filtered reads .gd files to the metadata tabel:
+```{r}
+for(k in 1:nrow(metadataAssembly)){
+  metadataAssembly$processedFinalGraphName <- paste(metadataAssembly$LibraryName, ".3processed.gd",
+                                                    sep = "") 
+}
+metadataAssembly$processedFinalGraphName[1] <- paste(metadataAssembly$LibraryName[1], ".4processed.gd", sep = "")
+
+```
+
+PrinSeq graph reports of second-stage html file generation:
+```{r}
+prefix3 <- "D3_PrinSeq_html_Larida_maxlen"
+
+cmd <- MakePrinSeqHTML(metadata, prefix, metadataAssembly$processedFinalGraphName[1])
+
+suffix <- ".sub"  
+MakeQsubs(cmd, prefix3, suffix)
+```
+To remove the output files after you are done:
+```{r}
+RemoveQsubTempFiles(sharedPathAn, prefix3)
+```
+
+For centrifuge - columns for krona is 1 and 3

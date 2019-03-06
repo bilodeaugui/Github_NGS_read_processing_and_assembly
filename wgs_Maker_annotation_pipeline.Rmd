@@ -107,7 +107,7 @@ uniProtSwissPDB <- paste(programsPath, "databases/uniprot_sprot.fasta", sep = ""
 **Note,** require entire proteome from a  min of two related species and perhaps all of UniProt/SwissProt. 
 See advice for multiple proteomes for homology: https://groups.google.com/forum/#!topic/maker-devel/jbBm_4ycFU8
   
-**_Marsonnina brunnea_** available at: https://www.ncbi.nlm.nih.gov/genome/?term=txid698440[orgn]:
+**_Marssonina brunnea_** available at: https://www.ncbi.nlm.nih.gov/genome/?term=txid698440[orgn]:
 ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/298/775/GCA_000298775.1_ASM29877v1  
   
 For **_Sclerotinia sclerotiorum_**: https://www.ncbi.nlm.nih.gov/genome/?term=txid5180[orgn]   
@@ -128,7 +128,23 @@ pepRhyncomPath  <- paste(referencesPath, "Rhynchosporium_commune.version_1.pep.a
 pepScleborPath  <- paste(referencesPath, "Sclerotinia_borealis_f_4128.SBOR_1.pep.all.fa", sep = "")
 pepSclerscPath  <- paste(referencesPath, "Scerotinia_sclerotiorum_GCF_000146945.2_ASM14694v2_protein.faa", sep = "")
 ```
-
+**Note:   
+Quast was used to evaluate assemblies and see how assemblies compared if using ABySS, SPAdes, or Newbler.   
+In the end the best assemblies came from using Newbler, and the assembly metrics provided by Newbler were recorded. The script for this is in "RstudioScript-June2017_LachnellulaSpp_assemblies.Rmd".   
+**Note:**
+Remember to use the modified assemblies that have the extra details that Newbler added after the >contig 
+name (3 tabs for contig name, length and some other detail) removed because this info created problems downstream.   
+i.e.,   
+>contig00001 1203988 12890445   
+agccctgcgatcgatcgggctagctagc   
+   
+using sed:   
+$ sed -e 's/^\(>[^[:space:]]*\).*/\1/' Lari_assembly_EG2017.fna > Lari_assembly_EG2017_mod.fna   
+   
+New format:   
+>contig00001   
+agccctgcgatcgatcgggctagctagc   
+   
 **Read in the metadata table:**  
 We need to specify where we put the assembly files for our genomes. We had this in our metadataAssembly table 
 from our previous script we ran called "RstudioScript-June2017_LachnellulaSpp_assemblies.Rmd"
@@ -179,10 +195,6 @@ cmd <- with(metadataAssemblies,
 suffix <- ".sub"; cat(bashDirections); MakeQsubs(cmd, prefix, suffix, node)
 ```
 
-**Note:**
-Remember to use the modified assemblies that have the extra details that Newbler added after the >contig 
-name (3 tabs for contig name, length and some other detail) removed because this info created problems downstream.    
-  
 **Note:** if there is an unexpected system failure, RepeatModeler can recover from it and continue from where it
 previously left off. See the README file in its program directory.  
 
