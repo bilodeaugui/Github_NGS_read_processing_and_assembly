@@ -532,6 +532,18 @@ Add the names of the fasta files to the metadata table:
 metadataAdapRM$fastaTrimAdapRem <- paste(metadataAdapRM$pathFastq, metadataAdapRM$LibraryName, ".adapRemMerged_trimmomatic.fasta", sep = "")
 ```
 
+Print the metadata table to file
+```{r}
+nameMetadata <- "ecobiomicsMetadata_FromBeatriz_metadataAdapRM_rdata.csv"
+write.table(metadataAdapRM,
+            file = file.path(sharedPath, nameMetadata),
+            sep       = ",",
+            row.names = TRUE, 
+            col.names = NA, 
+            quote     = FALSE)
+
+```
+
 -----------------------------starting November 20, 2019 author: Beatriz Lujan-----------------------------------
 
 *Created a new function to submit jobs that works in the GPSC, called MakeJobs() to substitute MakeQsubs(). 
