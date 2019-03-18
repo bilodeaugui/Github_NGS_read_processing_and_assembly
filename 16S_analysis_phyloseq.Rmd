@@ -1,0 +1,102 @@
+---
+title: "Untitled"
+author: "Beatriz"
+date: "February 1, 2019"
+output: html_document
+---
+
+Load phyloseq and ggplot
+```{r}
+library("phyloseq") #; packageVersion("phyloseq")
+library("ggplot2") #; packageVersion("ggplot2")
+#theme_set(theme_bw())
+```
+
+1. Load data
+```{r}
+region <- "16S"
+sharedPathAn <- "/fs/hnas1-evs1/Dgrdi/grdi_eco/groups/bilodeaug/gir001/PIRL_working/ecoBiomics_Ian/"
+biomTable <-import_biom( paste ( sharedPathAn, "OTU_tables/", region, "_otu_table.biom", sep=""))
+mappingFile <- import_qiime_sample_data(paste(sharedPathAn, "OTU_tables/", region, "-mapping-file.txt", sep=""))
+library(ape)
+mergedData <-  merge_phyloseq(biomTable, mappingFile) #if no tree
+colnames(sample_data(mergedData))[5] = "SampleType"
+# colnames(tax_table(ITSmergedData))[8] = "Genus" 
+# colnames(tax_table(ITSmergedData))[9] = "Species" 
+mergedDatar  = transform_sample_counts(mergedData, function(x) x / sum(x) )
+mergedDatafr = filter_taxa(mergedDatar, function(x) mean(x) > 1e-3, TRUE)
+mergedDatafrf = prune_taxa(taxa_sums(mergedDatafr) > 0, mergedDatafr)
+```
+
+See the data:
+```{r}
+sample_names(mergedData)
+ntaxa(mergedData)
+rank_names(mergedData)
+sample_variables(mergedData)
+```
+```{r}
+plot_bar(mergedDatafrf, "SampleType", fill="Rank3") #+ 
+  #theme(legend.key.size = unit(0.3,"cm"), axis.text.x = element_text(angle = 0, size=8, hjust = 0.5), plot.title = element_text(hjust = 0.5)) +
+  theme(legend.position = "none") 
+#ggsave(paste (sharedPathAn, "/OTU_tables/COI-all-PWvsPS.pdf", sep = ""))
+  plot_richness(mergedData, x="ExtractionKit", color="SampleType", measures=c("Chao1", "Shannon"))
+
+```
+
+
+
+
+
+
+
+
+2. Water samples
+```{r}
+water = subset_samples(mergedData, SampleType == "water") 
+waterr = transform_sample_counts(water, function(x) x / sum(x) )
+waterfr = filter_taxa(waterr, function(x) mean(x) > 1e-3, TRUE)
+waterfrf = prune_taxa(taxa_sums(waterfr) > 0, waterfr)
+
+plot_bar(waterfrf, "Rank2", fill="Rank3", facet_grid = "ExtractionKit~Experiment") + 
+  #theme(legend.key.size = unit(0.3,"cm"), axis.text.x = element_text(angle = 0, size=8, hjust = 0.5), plot.title = element_text(hjust = 0.5)) #+
+  theme(legend.position = "none") 
+#ggsave(paste (sharedPathAn, "/OTU_tables/COI-all-PWvsPS.pdf", sep = ""))
+```
+
+
+
+
+2. Water samples
+Powersoil spiked vs non spiked 
+
+```{r}
+waterPS = subset_samples(mergedData, SampleType == "water" & ExtractionKit == "PowerSoil") 
+waterPSr = transform_sample_counts(waterPS, function(x) x / sum(x) )
+waterPSfr = filter_taxa(waterPSr, function(x) mean(x) > 1e-3, TRUE)
+waterPSfrf = prune_taxa(taxa_sums(waterPSfr) > 0, waterPSfr)
+
+plot_bar(waterPSfrf, "Rank2", fill="Rank3", facet_grid = "ExtractionKit~Experiment") #+ 
+  #theme(legend.key.size = unit(0.3,"cm"), axis.text.x = element_text(angle = 0, size=8, hjust = 0.5), plot.title = element_text(hjust = 0.5)) #+
+  #theme(legend.position = "none") 
+#ggsave(paste (sharedPathAn, "/OTU_tables/COI-all-PWvsPS.pdf", sep = ""))
+```
+
+
+1. Spiked Rank 2, family,  species
+
+
+```{r}
+waterSpiked = subset_samples(mergedData, SampleType == "water" & Experiment == "Spike") 
+waterSpikedr = transform_sample_counts(waterSpiked, function(x) x / sum(x) )
+waterSpikedfr = filter_taxa(waterSpikedr, function(x) mean(x) > 1e-3, TRUE)
+waterSpikedfrf = prune_taxa(taxa_sums(waterSpikedfr) > 0, waterSpikedfr)
+waterSpikedfrf2<- subset_taxa(waterSpikedfrf, Rank7!="NA" )
+waterSpikedfrf2<- subset_taxa(waterSpikedfrf2, Rank7!="Ambiguous_taxa" )
+
+plot_bar(waterSpikedfrf2, "Rank6", fill="Rank7") #+ 
+  #theme(legend.key.size = unit(0.3,"cm"), axis.text.x = element_text(angle = 0, size=8, hjust = 0.5), plot.title = element_text(hjust = 0.5)) #+
+#  theme(legend.position = "none") 
+#ggsave(paste (sharedPathAn, "/OTU_tables/COI-all-PWvsPS.pdf", sep = ""))
+
+```

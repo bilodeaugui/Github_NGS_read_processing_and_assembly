@@ -1,0 +1,202 @@
+---
+title: "Untitled"
+author: "Beatriz"
+date: "February 1, 2019"
+output: html_document
+---
+
+Load phyloseq and ggplot
+```{r}
+library("phyloseq") #; packageVersion("phyloseq")
+library("ggplot2") #; packageVersion("ggplot2")
+#theme_set(theme_bw())
+```
+
+1. Load data
+```{r}
+region <- "ITS"
+sharedPathAn <- "/fs/hnas1-evs1/Dgrdi/grdi_eco/groups/bilodeaug/gir001/PIRL_working/ecoBiomics_Ian/"
+biomTable <-import_biom( paste ( sharedPathAn, "OTU_tables/", region, "_otu_table.biom", sep=""))
+mappingFile <- import_qiime_sample_data(paste(sharedPathAn, "OTU_tables/", region, "-mapping-file.txt", sep=""))
+library(ape)
+ITSmergedData <-  merge_phyloseq(biomTable, mappingFile) #if no tree
+colnames(sample_data(ITSmergedData))[5] = "SampleType"
+# colnames(tax_table(ITSmergedData))[8] = "Genus" 
+# colnames(tax_table(ITSmergedData))[9] = "Species" 
+mergedDatar  = transform_sample_counts(ITSmergedData, function(x) x / sum(x) )
+mergedDatafr = filter_taxa(mergedDatar, function(x) mean(x) > 1e-3, TRUE)
+####needs non zero mergedDatafrC = filter_taxa(mergedDatafr, function(x) sum(x > 3) > (0.2*length(x)), TRUE)
+####needs non zero mergedDatafrf = filter_taxa(mergedDatafr, function(x) sd(x)/mean(x) > 3.0, TRUE)
+mergedDatafrf = prune_taxa(taxa_sums(mergedDatafr) > 0, mergedDatafr)
+```
+
+See the data:
+```{r}
+sample_names(ITSmergedData)
+ntaxa(ITSmergedData)
+rank_names(ITSmergedData)
+sample_variables(ITSmergedData)
+```
+```{r}
+plot_bar(mergedDatafrf, "SampleType", fill="Rank3") #+ 
+  #theme(legend.key.size = unit(0.3,"cm"), axis.text.x = element_text(angle = 0, size=8, hjust = 0.5), plot.title = element_text(hjust = 0.5)) +
+  theme(legend.position = "none") 
+#ggsave(paste (sharedPathAn, "/OTU_tables/COI-all-PWvsPS.pdf", sep = ""))
+
+  plot_richness(ITSmergedData, x="ExtractionKit", color="SampleType", measures=c("Chao1", "Shannon"))
+
+```
+
+2. Soil samples
+```{r}
+ITSsoil = subset_samples(ITSmergedData, SampleType == "soil") 
+ITSsoilr = transform_sample_counts(ITSsoil, function(x) x / sum(x) )
+ITSsoilfr = filter_taxa(ITSsoilr, function(x) mean(x) > 1e-3, TRUE)
+ITSsoilfrf = prune_taxa(taxa_sums(ITSsoilfr) > 0, ITSsoilfr)
+
+plot_bar(ITSsoilfrf, "Rank2", fill="Rank3", facet_grid = "ExtractionKit~SampleType") + 
+  #theme(legend.key.size = unit(0.3,"cm"), axis.text.x = element_text(angle = 0, size=8, hjust = 0.5), plot.title = element_text(hjust = 0.5)) #+
+  theme(legend.position = "none") 
+#ggsave(paste (sharedPathAn, "/OTU_tables/COI-all-PWvsPS.pdf", sep = ""))
+```
+
+```{r}
+ITSsoilAscor = subset_taxa(ITSsoilr, Rank2 == "p__Ascomycota")
+ITSsoilAscofr = filter_taxa(ITSsoilAscor, function(x) mean(x) > 1e-3, TRUE)
+ITSsoilAscofrf = prune_taxa(taxa_sums(ITSsoilAscofr) > 0, ITSsoilAscofr)
+
+plot_bar(ITSsoilAscofrf, "Rank3", fill="Rank4", facet_grid = "ExtractionKit~SampleType") + 
+  #theme(legend.key.size = unit(0.3,"cm"), axis.text.x = element_text(angle = 0, size=8, hjust = 0.5), plot.title = element_text(hjust = 0.5)) #+
+  theme(legend.position = "none") 
+#ggsave(paste (sharedPathAn, "/OTU_tables/COI-all-PWvsPS.pdf", sep = ""))
+
+```
+  
+```{r}
+ITSsoilBasr= subset_taxa(ITSsoilr, Rank2 == "p__Basidiomycota")
+ITSsoilBasfr = filter_taxa(ITSsoilBasr, function(x) mean(x) > 1e-3, TRUE)
+ITSsoilBasfrf = prune_taxa(taxa_sums(ITSsoilBasfr) > 0, ITSsoilBasfr)
+
+plot_bar(ITSsoilBasfrf, "Rank3", fill="Rank4", facet_grid = "ExtractionKit~SampleType") + 
+  #theme(legend.key.size = unit(0.3,"cm"), axis.text.x = element_text(angle = 0, size=8, hjust = 0.5), plot.title = element_text(hjust = 0.5)) #+
+  theme(legend.position = "none") 
+#ggsave(paste (sharedPathAn, "/OTU_tables/COI-all-PWvsPS.pdf", sep = ""))
+
+```
+
+```{r}
+ITSsoilMucr= subset_taxa(ITSsoilr, Rank2 == "p__Mucoromycota")
+ITSsoilMucfr = filter_taxa(ITSsoilMucr, function(x) mean(x) > 1e-3, TRUE)
+ITSsoilMucfrf = prune_taxa(taxa_sums(ITSsoilMucfr) > 0, ITSsoilMucfr)
+
+plot_bar(ITSsoilMucfrf, "Rank3", fill="Rank4", facet_grid = "ExtractionKit~SampleType") + 
+  #theme(legend.key.size = unit(0.3,"cm"), axis.text.x = element_text(angle = 0, size=8, hjust = 0.5), plot.title = element_text(hjust = 0.5)) #+
+  theme(legend.position = "none") 
+#ggsave(paste (sharedPathAn, "/OTU_tables/COI-all-PWvsPS.pdf", sep = ""))
+
+```
+
+```{r}
+#plot_richness(ITSsoil, x="ExtractionKit", measures=c("Chao1", "Shannon"))
+plot_richness(ITSsoil, x="ExtractionKit", color="SampleType", measures=c("Chao1", "Shannon"))
+```
+Even though we see that diversity of PowerWater seems higher, we dont have a p-value to know if PW is significantly higher than FD
+
+
+3. Benthic samples
+```{r}
+ITSben = subset_samples(ITSmergedData, SampleType == "benthic") 
+ITSbenr = transform_sample_counts(ITSben, function(x) x / sum(x) )
+ITSbenfr = filter_taxa(ITSbenr, function(x) mean(x) > 1e-3, TRUE)
+ITSbenfrf = prune_taxa(taxa_sums(ITSbenfr) > 0, ITSbenfr)
+
+plot_bar(ITSbenfrf, "Rank4", fill="Rank5", facet_grid = "ExtractionKit~SampleType") + 
+  #theme(legend.key.size = unit(0.3,"cm"), axis.text.x = element_text(angle = 0, size=8, hjust = 0.5), plot.title = element_text(hjust = 0.5)) #+
+  theme(legend.position = "none") 
+#ggsave(paste (sharedPathAn, "/OTU_tables/COI-all-PWvsPS.pdf", sep = ""))
+```
+
+```{r}
+plot_richness(ITSben, x="ExtractionKit", color="SampleType", measures=c("Chao1", "Shannon"))
+```
+Even though we see that diversity of PowerWater seems higher, we dont have a p-value to know if PW is significantly higher than FD
+
+------------------------------------------COMPARE ITS APPROACHES--------------------------
+The aim is to compare de novo using rdp or blast classification, and closed reference (only rdp available). First lets compare diversity, then compare taxa graphically. To ease the visualizations we will: 
+1. Look at benthic samples only
+2. Remove everything that is unclassified from genus onwards. 
+
+
+```{r}
+mergedDatafrf2<- subset_taxa(mergedDatafrf, Rank5!="NA" )
+mergedDatafrf2<- subset_taxa(mergedDatafrf2, Rank5!="f__unidentified" )
+# UmergedDatafrF <- subset_taxa(mergedDatafrf, Rank5=="NA" | Rank5== "f__unidentified" )
+# plot_bar(UmergedDatafrF, "Rank3", facet_grid = "SampleType", fill="Rank7") #+ 
+# plot_bar(UmergedDatafrF, "Rank5", facet_grid = "SampleType", fill="Rank6")
+# UmergedDatafrF = prune_taxa(taxa_sums(UmergedDatafrF) > 0, UmergedDatafrF)
+ITSben2 = subset_samples(mergedDatafrf2, SampleType == "benthic") 
+```
+
+```{r}
+region <- "ITS"
+sharedPathAn <- "/fs/hnas1-evs1/Dgrdi/grdi_eco/groups/bilodeaug/gir001/PIRL_working/ecoBiomics_Ian/"
+biomTableCR <-import_biom( paste ( sharedPathAn, "other-otu-methods/closed-ref/", region, "_otu_table.biom", sep=""))
+mappingFile <- import_qiime_sample_data(paste(sharedPathAn, "OTU_tables/", region, "-mapping-file.txt", sep=""))
+ITSmergedDataCR <-  merge_phyloseq(biomTableCR, mappingFile) #if no tree
+colnames(sample_data(ITSmergedDataCR))[5] = "SampleType"
+mergedDatarCR  = transform_sample_counts(ITSmergedDataCR, function(x) x / sum(x) )
+mergedDatafrCR = filter_taxa(mergedDatarCR, function(x) mean(x) > 1e-3, TRUE)
+mergedDatafrfCR = prune_taxa(taxa_sums(mergedDatafrCR) > 0, mergedDatafrCR)
+mergedDatafrfCR2<- subset_taxa(mergedDatafrfCR, Rank5!="NA" )
+mergedDatafrfCR2<- subset_taxa(mergedDatafrfCR2, Rank5!="f__unidentified" )
+ITSbenCR2 = subset_samples(mergedDatafrfCR2, SampleType == "benthic") 
+```
+
+```{r}
+region <- "ITS"
+sharedPathAn <- "/fs/hnas1-evs1/Dgrdi/grdi_eco/groups/bilodeaug/gir001/PIRL_working/ecoBiomics_Ian/"
+biomTableB <-import_biom( paste ( sharedPathAn, "K_classify/ITS-blast/", region, "_otu_table.biom", sep=""))
+mappingFile <- import_qiime_sample_data(paste(sharedPathAn, "OTU_tables/", region, "-mapping-file.txt", sep=""))
+ITSmergedDataB <-  merge_phyloseq(biomTableB, mappingFile) #if no tree
+colnames(sample_data(ITSmergedDataB))[5] = "SampleType"
+mergedDatarB  = transform_sample_counts(ITSmergedDataB, function(x) x / sum(x) )
+mergedDatafrB = filter_taxa(mergedDatarB, function(x) mean(x) > 1e-3, TRUE)
+mergedDatafrfB = prune_taxa(taxa_sums(mergedDatafrB) > 0, mergedDatafrB)
+mergedDatafrfB2<- subset_taxa(mergedDatafrfB, Rank5!="NA" )
+mergedDatafrfB2<- subset_taxa(mergedDatafrfB2, Rank5!="f__unidentified" )
+ITSbenB2 = subset_samples(mergedDatafrfB2, SampleType == "benthic") 
+
+#NAmergedDatafrfB2<- subset_taxa(mergedDatafrfB, Rank5=="NA" |  Rank5=="f__unidentified" )
+```
+
+For plots:
+
+```{r}
+library(grid)
+p1 <- plot_richness(ITSmergedData, x="SampleType", color="ExtractionKit", measures=c("Observed", "Chao1")) + 
+  ggtitle("De novo OTU Picking using the RDP classifier") + theme(plot.title = element_text(hjust = 0.5, size = 10), 
+                                                                  axis.title=element_text(size=8)) 
+p2 <- plot_richness(ITSmergedDataB, x="SampleType", color="ExtractionKit", measures=c("Observed", "Chao1")) + 
+  ggtitle("De novo OTU Picking using BLAST") + theme(plot.title = element_text(hjust = 0.5, size = 10),
+                                                     axis.title=element_text(size=8))
+p3 <- plot_richness(ITSmergedDataCR, x="SampleType", color="ExtractionKit", measures=c("Observed", "Chao1")) + 
+  ggtitle("Closed reference OTU Picking using the RDP classifier") + theme(plot.title = element_text(hjust = 0.5, size = 10),
+                                                                           axis.title=element_text(size=8))
+grid.newpage()
+grid.draw(rbind(ggplotGrob(p1), ggplotGrob(p2), ggplotGrob(p3), size = "last"))
+
+plot_bar(ITSben2, "Rank5",  fill="Rank7") + 
+  theme(legend.key.size = unit(0.3,"cm"), axis.text.x = element_text( size=8 ), plot.title = element_text(hjust = 0.5)) +
+  ggtitle("De novo OTU Picking using the RDP classifier")  #+ theme(legend.position = "none") 
+
+plot_bar(ITSbenCR2, "Rank5",  fill="Rank7") + 
+  ggtitle("Closed reference OTU Picking using the RDP classifier")  + theme(legend.position = "none") 
+
+plot_bar(ITSbenB2, "Rank5", fill="Rank7") + 
+  theme(legend.key.size = unit(0.3,"cm"), axis.text.x = element_text( size=8 ), plot.title = element_text(hjust = 0.5)) +
+  ggtitle("De novo OTU Picking using BLAST") #+ theme(legend.position = "none") 
+
+  
+
+```
+

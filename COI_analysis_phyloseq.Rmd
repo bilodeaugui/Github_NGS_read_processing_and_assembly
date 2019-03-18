@@ -144,10 +144,6 @@ plot_bar(coiPWPS, "Genus", fill="Species", facet_grid = "ExtractionKit~SampleTyp
 ggsave(paste (sharedPathAn, "/OTU_tables/COI-all-PWvsPS.pdf", sep = ""))
 ```
 
-
-
-
-
 WORKING WITH COI SOIL SAMPLES
 1. Load data
 ```{r}
