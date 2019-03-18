@@ -11,15 +11,14 @@ CONVERT METADATA CSV TO .TXT MAPPING FILE
 This file is required for downstream analyses in qiime
 
 ```{r}
-#home <- ("/fs/hnas1-evs1/Dgrdi/grdi_eco/groups/bilodeaug/gir001/PIRL_working/ecoBiomics_Ian/")
 sharedPathAn <- "/fs/hnas1-evs1/Dgrdi/grdi_eco/groups/bilodeaug/gir001/PIRL_working/ecoBiomics_Ian/"
 ```
 
 ```{r}
 library(dplyr)
-#for (region in c("18S", "ITS", "COI")){
 for (region in c("16S", "18S", "ITS", "COI")){
-  metadata <- read.csv( paste(sharedPathAn, "OTU_tables/", region, "-metadata.csv", sep=""))
+#  metadata <- read.csv( paste(sharedPathAn, "OTU_tables/", region, "-metadata.csv", sep=""))
+  metadata <- read.csv( paste(sharedPathAn, "OTU_tables/", region, "-metadata-revised.csv", sep=""))
   mappingFile <- select(metadata, qiimeName, Region, Sample, Provider, Experiment, ExtractionKit)
   mappingFile$Barcode <- ("AGCACGAGCCTA") #from Qiime example, we will NOT use this, but need to have it 
   mappingFile$LinkerPrimer <- ("YATGCTGCCTCCCGTAGGAGT") #from Qiime example, we will NOT use this, but need to have it
@@ -110,9 +109,9 @@ system (paste("echo \'summarize_taxa:level 2,3,4,5,6,7,8,9,10,11,12,13,14,15\nsu
 system (paste("echo \'summarize_taxa:level 2,3,4,5,6,7,8,9\nsummarize_taxa:upper_percentage 0.001' > ", 
               paste(sharedPathAn, "OTU_tables/downstream_processing", "/parameters-ITS.txt", sep="") , sep = "")) 
 
-
 for (region in c("16S", "18S", "ITS", "COI")){
-  metadata <- read.csv( paste(sharedPathAn, "OTU_tables/", region, "-metadata.csv", sep=""))
+  #metadata <- read.csv( paste(sharedPathAn, "OTU_tables/", region, "-metadata.csv", sep=""))
+  metadata <- read.csv( paste(sharedPathAn, "OTU_tables/", region, "-metadata-revised.csv", sep=""))
   samples <- unique(metadata$Sample)
   biomTable <- paste (region, "_otu_table.biom", sep="")
   mappingFile <-paste(region, "-mapping-file.txt", sep="")
